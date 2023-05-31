@@ -1,0 +1,4 @@
+{
+  "mongoURI": "URI HERE",
+  "collectionName": "scannedServers"
+}
