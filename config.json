@@ -1,4 +1,8 @@
 {
   "mongoURI": "URI HERE",
-  "collectionName": "scannedServers"
+  "collectionName": "scannedServers",
+  "scanDelay": 300000,
+  "maxPings": 2000,
+  "pingTimeout": 3000,
+  "pingDelay": 3000
 }
