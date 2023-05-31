@@ -4,10 +4,10 @@ const { MinecraftServerListPing } = require("minecraft-status");
 const { MongoClient } = require('mongodb');
 const client = new MongoClient(config.collectionName);
 const scannedServers = client.db("MCSS").collection(config.dbName);
-const scanDelay = 300000;
-const maxPings = 2000;
-const pingTimeout = 5000;
-const pingDelay = 3000;
+const scanDelay = config.scanDelay;
+const maxPings = config.maxPings;
+const pingTimeout = config.pingTimeout;
+const pingDelay = config.pingDelay;
 var serverList;
 var totalServers;
 
