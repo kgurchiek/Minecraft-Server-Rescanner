@@ -12,7 +12,7 @@ var serverList;
 var totalServers;
 
 async function main() {
-  serverList = await fetch('https://github.com/kgurchiek/Minecraft-Server-Scanner/raw/main/ips');
+  serverList = Buffer.from(await (await fetch('https://github.com/kgurchiek/Minecraft-Server-Scanner/raw/main/ips')).arrayBuffer());
   totalServers = serverList.length / 6;
   console.log(`Total servers: ${totalServers}`);
   var serversPinged = 0;
