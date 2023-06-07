@@ -2,7 +2,7 @@
 const config = require('./config.json');
 const { MinecraftServerListPing } = require("minecraft-status");
 const { MongoClient } = require('mongodb');
-const client = new MongoClient(config.collectionName);
+const client = new MongoClient(config.mongoURI);
 const scannedServers = client.db("MCSS").collection(config.dbName);
 const scanDelay = config.scanDelay;
 const maxPings = config.maxPings;
