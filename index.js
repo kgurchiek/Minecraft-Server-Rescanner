@@ -52,7 +52,12 @@ async function main() {
         }
         var location = await cityLookup.get('8.8.8.8');
         if (location != null) {
-          newObj['geo'] = { country: location.country.iso_code }
+          newObj['geo'] = {};
+          if (location.country != null) {
+            newObj['geo']['country'] = location.country.iso_code;
+          } else {
+            newObj['geo']['country'] = location.registered_country.iso_code;
+          }
           if (location.city != null) {
             newObj['geo']['city'] = location.city.names.en;
             newObj['geo']['lat'] = location.location.latitude;
