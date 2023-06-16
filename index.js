@@ -50,7 +50,7 @@ async function main() {
           hasForgeData: response.forgeData != null,
           lastSeen: Math.floor((new Date()).getTime() / 1000)
         }
-        var location = await cityLookup.get('8.8.8.8');
+        var location = await cityLookup.get(server.ip);
         if (location != null) {
           newObj['geo'] = {};
           if (location.country != null) {
@@ -64,7 +64,7 @@ async function main() {
             newObj['geo']['lon'] = location.location.longitude;
           }
         }
-        var org = await asnLookup.get('8.8.8.8');
+        var org = await asnLookup.get(server.ip);
         if (org != null) newObj['org'] = org.autonomous_system_organization;
 
         //scannedServers.updateOne({ ip: server.ip, port: server.port }, { $set: newObj }, { upsert: true } )
