@@ -1,6 +1,7 @@
 // Fetches dependencies and inits variables
 const config = require('./config.json');
 const { MinecraftServerListPing } = require("minecraft-status");
+var maxmind = require('maxmind');
 const { MongoClient } = require('mongodb');
 const client = new MongoClient(config.mongoURI);
 const scannedServers = client.db("MCSS").collection(config.dbName);
@@ -12,6 +13,8 @@ var serverList;
 var totalServers;
 
 async function main() {
+  const cityLookup = await maxmind.open('./GeoLite2-City.mmdb');
+  const asnLookup = await maxmind.open('./GeoLite2-ASN.mmdb');
   serverList = Buffer.from(await (await fetch('https://github.com/kgurchiek/Minecraft-Server-Scanner/raw/main/ips')).arrayBuffer());
   totalServers = serverList.length / 6;
   console.log(`Total servers: ${totalServers}`);
@@ -47,6 +50,18 @@ async function main() {
           hasForgeData: response.forgeData != null,
           lastSeen: Math.floor((new Date()).getTime() / 1000)
         }
+        var location = await cityLookup.get('8.8.8.8');
+        if (location != null) {
+          newObj['geo'] = { country: location.country.iso_code }
+          if (location.city != null) {
+            newObj['geo']['city'] = location.city.names.en;
+            newObj['geo']['lat'] = location.location.latitude;
+            newObj['geo']['lon'] = location.location.longitude;
+          }
+        }
+        var org = await asnLookup.get('8.8.8.8');
+        if (org != null) newObj['org'] = org.autonomous_system_organization;
+
         //scannedServers.updateOne({ ip: server.ip, port: server.port }, { $set: newObj }, { upsert: true } )
         operations.push({
           updateOne: {
