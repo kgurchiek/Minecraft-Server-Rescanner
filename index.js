@@ -39,6 +39,7 @@ async function main() {
     try {
       const response = await MinecraftServerListPing.ping(0, server.ip, server.port, pingTimeout);
       if (typeof response === 'object') {
+        const lastSeen = Math.floor((new Date()).getTime() / 1000);
         newObj = {
           ip: server.ip,
           port: server.port,
@@ -48,7 +49,7 @@ async function main() {
           enforcesSecureChat: response.enforcesSecureChat,
           hasFavicon: response.favicon != null,
           hasForgeData: response.forgeData != null,
-          lastSeen: Math.floor((new Date()).getTime() / 1000)
+          lastSeen: lastSeen
         }
         var location = await cityLookup.get(server.ip);
         if (location != null) {
@@ -76,7 +77,7 @@ async function main() {
           }
         });
         for (const player of response.players.sample) {
-          player['lastSeen'] = Math.floor((new Date()).getTime() / 1000);
+          player['lastSeen'] = lastSeen;
           operations.push({
             updateOne: { 
               filter: { ip: server.ip, "port": server.port }, 
