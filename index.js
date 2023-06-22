@@ -43,7 +43,7 @@ async function main() {
           ip: server.ip,
           port: server.port,
           version: response.version,
-          players: response.players,
+          players: { max: response.players.max, online: response.players.online },
           description: response.description,
           enforcesSecureChat: response.enforcesSecureChat,
           hasFavicon: response.favicon != null,
@@ -75,8 +75,23 @@ async function main() {
             upsert: true
           }
         });
+        for (const player of response.players.sample) {
+          player['lastSeen'] = Math.floor((new Date()).getTime() / 1000);
+          operations.push({
+            updateOne: { 
+              filter: { ip: server.ip, "port": server.port }, 
+              update: { "$pull": { "players.sample": { name: player.name, id: player.id } } }
+            }
+          });
+          operations.push({
+            updateOne: { 
+              filter: { ip: server.ip, "port": server.port }, 
+              update: { "$push": { "players.sample": player } }
+            }
+          });
+        }
 
-        if (operations.length == 1000) {
+        if (operations.length >= 1000) {
           scannedServers.bulkWrite(operations)
           .catch(err => {
             console.log(err);
