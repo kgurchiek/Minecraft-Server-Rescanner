@@ -92,7 +92,7 @@ async function main() {
           });
         }
 
-        if (operations.length >= 1000) {
+        if (operations.length >= 3000) {
           scannedServers.bulkWrite(operations)
           .catch(err => {
             console.log(err);
@@ -133,6 +133,11 @@ async function main() {
         }
 
         // finish scan
+        scannedServers.bulkWrite(operations)
+        .catch(err => {
+          console.log(err);
+        })
+        operations = [];
         console.log(`Finished scanning in ${(new Date() - startTime) / 1000} seconds at ${new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" })}.`);
         setTimeout(function(){ main() }, scanDelay)
       }
