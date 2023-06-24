@@ -1,5 +1,6 @@
 // Fetches dependencies and inits variables
 const config = require('./config.json');
+const { MinecraftServerListPing } = require("minecraft-status");
 var maxmind = require('maxmind');
 const net = require('net');
 const varint = require('varint');
@@ -34,68 +35,12 @@ async function main() {
     return { ip, port }
   }
 
-  function ping(ip, port, pingTimeout) {
-    return new Promise((resolve) => {
-      var packetLength = 0;
-    
-      setTimeout(function() {
-        if (!hasResponded) resolve('timeout');
-      }, pingTimeout);
-    
-      var hasResponded = false;
-      var response = '';
-    
-      const client = new net.Socket();
-      client.connect(port, ip, () => {
-        const handshakePacket = Buffer.concat([
-          Buffer.from([0x00]), // packet ID
-          Buffer.from(varint.encode(0)), //protocol version
-          Buffer.from([ip.length]),
-          Buffer.from(ip, 'utf-8'), // server address
-          Buffer.from(new Uint16Array([port]).buffer).reverse(), // server port
-          Buffer.from([0x01]) // next state (2)
-        ]);
-        var packetLength = Buffer.alloc(1);
-        packetLength.writeUInt8(handshakePacket.length);
-        var buffer = Buffer.concat([packetLength, handshakePacket]);
-        client.write(buffer);
-    
-        const statusRequestPacket = Buffer.from([0x00]);
-        packetLength = Buffer.alloc(1);
-        packetLength.writeUInt8(statusRequestPacket.length);
-        buffer = Buffer.concat([packetLength, statusRequestPacket]);
-        client.write(buffer);
-      });
-    
-      client.on('data', (data) => {
-        //client.destroy(); // kill client after server's response
-        response += data.toString();
-    
-        if (packetLength == 0) packetLength = varint.decode(data) + 6;
-    
-        if (Buffer.byteLength(response) >= packetLength) {
-          resolve(response);
-          hasResponded = true;
-        }
-      });
-    
-      client.on('error', (err) => {
-        //console.error(`Error: ${err}`);
-      });
-    
-      client.on('close', () => {
-        //console.log('Connection closed');
-      });
-    });
-  }
-
   async function pingServer(server) {
     serversPinged++;
     if (serversPinged % 20000 == 0) console.log(serversPinged);
     try {
-      var response = await ping(server.ip, server.port, pingTimeout);
-      if (response != 'timeout') {
-        response = JSON.parse(response.substring(response.indexOf('{')));
+      const response = await MinecraftServerListPing.ping(0, server.ip, server.port, pingTimeout);
+      if (typeof response === 'object') {
         const lastSeen = Math.floor((new Date()).getTime() / 1000);
         newObj = {
           ip: server.ip,
