@@ -93,7 +93,7 @@ async function main() {
     serversPinged++;
     if (serversPinged % 20000 == 0) console.log(serversPinged);
     try {
-      const response = await ping(server.ip, server.port, pingTimeout);
+      var response = await ping(server.ip, server.port, pingTimeout);
       if (response != 'timeout') {
         response = response.substring(response.indexOf('{'));
         const lastSeen = Math.floor((new Date()).getTime() / 1000);
