@@ -133,20 +133,22 @@ async function main() {
             upsert: true
           }
         });
-        for (const player of response.players.sample) {
-          player['lastSeen'] = lastSeen;
-          operations.push({
-            updateOne: { 
-              filter: { ip: server.ip, "port": server.port }, 
-              update: { "$pull": { "players.sample": { name: player.name, id: player.id } } }
-            }
-          });
-          operations.push({
-            updateOne: { 
-              filter: { ip: server.ip, "port": server.port }, 
-              update: { "$push": { "players.sample": player } }
-            }
-          });
+        if (Array.isArray(response.players.sample)) {
+          for (const player of response.players.sample) {
+            player['lastSeen'] = lastSeen;
+            operations.push({
+              updateOne: { 
+                filter: { ip: server.ip, "port": server.port }, 
+                update: { "$pull": { "players.sample": { name: player.name, id: player.id } } }
+              }
+            });
+            operations.push({
+              updateOne: { 
+                filter: { ip: server.ip, "port": server.port }, 
+                update: { "$push": { "players.sample": player } }
+              }
+            });
+          }
         }
 
         if (operations.length >= 3000) {
