@@ -95,7 +95,7 @@ async function main() {
     try {
       const response = await ping(server.ip, server.port, pingTimeout);
       if (response != 'timeout') {
-        response = JSON.parse(response);
+        response = response.substring(response.indexOf('{'));
         const lastSeen = Math.floor((new Date()).getTime() / 1000);
         newObj = {
           ip: server.ip,
