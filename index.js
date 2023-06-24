@@ -1,6 +1,8 @@
 // Fetches dependencies and inits variables
 const config = require('./config.json');
 var maxmind = require('maxmind');
+const net = require('net');
+const varint = require('varint');
 const { MongoClient } = require('mongodb');
 const client = new MongoClient(config.mongoURI);
 const scannedServers = client.db("MCSS").collection(config.dbName);
