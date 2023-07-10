@@ -96,6 +96,7 @@ async function main() {
         }
 
         if (operations.length >= 3000) {
+          console.log('Writing to db');
           scannedServers.bulkWrite(operations)
           .catch(err => {
             console.log(err);
@@ -136,6 +137,7 @@ async function main() {
         }
 
         // finish scan
+        console.log('Writing to db');
         scannedServers.bulkWrite(operations)
         .catch(err => {
           console.log(err);
