@@ -8,7 +8,7 @@ if (config.saveToMongo) {
   const client = new MongoClient(config.mongoURI);
   scannedServers = client.db("MCSS").collection(config.dbName);
 }
-var fs = config.writeToFile || config.customIps ? fs = require('fs') : null;
+var fs = config.saveToFile || config.customIps ? fs = require('fs') : null;
 var serverList;
 var totalServers;
 
@@ -25,8 +25,8 @@ async function main() {
   var serversPinged = 0;
   var startTime = new Date();
   var operations = [];
-  var writeStream = config.writeToFile ? fs.createWriteStream('./results') : null;
-  if (config.writeToFile) writeStream.write('[')
+  var writeStream = config.saveToFile ? fs.createWriteStream('./results') : null;
+  if (config.saveToFile) writeStream.write('[')
   
   // start randomly within the list to vary which servers come first, since packet loss gets worse futher into the scan
   var startNum = Math.round(Math.random() * Math.floor(totalServers / config.maxPings)) * config.maxPings;
@@ -110,7 +110,7 @@ async function main() {
             })
             operations = [];
           }
-        } else if (config.writeToFile) {
+        } else if (config.saveToFile) {
           newObj.players = response.players;
           if (config.compressed) {
             const splitIP = newObj.ip.split('.');
@@ -168,7 +168,7 @@ async function main() {
           })
           operations = [];
         }
-        if (config.writeToFile) {
+        if (config.saveToFile) {
           if (!config.compressed) writeStream.write(']');
           writeStream.end();
         }
