@@ -1,8 +1,14 @@
 {
+  "saveToMongo": false,
   "mongoURI": "URI HERE",
   "dbName": "scannedServers",
-  "scanDelay": 300000,
+  "saveToFile": true,
+  "compressed": false,
+  "repeat": false,
+  "repeatDelay": 300000,
   "maxPings": 2000,
   "pingTimeout": 3000,
-  "pingDelay": 3000
+  "pingDelay": 3000,
+  "customIps": false,
+  "ipsPath": "./ips"
 }

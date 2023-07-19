@@ -2,29 +2,35 @@
 const config = require('./config.json');
 const { MinecraftServerListPing } = require("minecraft-status");
 var maxmind = require('maxmind');
-const { MongoClient } = require('mongodb');
-const client = new MongoClient(config.mongoURI);
-const scannedServers = client.db("MCSS").collection(config.dbName);
-const scanDelay = config.scanDelay;
-const maxPings = config.maxPings;
-const pingTimeout = config.pingTimeout;
-const pingDelay = config.pingDelay;
+var scannedServers;
+if (config.saveToMongo) {
+  const MongoClient = require('mongodb').MongoClient;
+  const client = new MongoClient(config.mongoURI);
+  scannedServers = client.db("MCSS").collection(config.dbName);
+}
+var fs = config.writeToFile ? fs = require('fs') : null;
 var serverList;
 var totalServers;
 
 async function main() {
   const cityLookup = await maxmind.open('./GeoLite2-City.mmdb');
   const asnLookup = await maxmind.open('./GeoLite2-ASN.mmdb');
-  serverList = Buffer.from(await (await fetch('https://github.com/kgurchiek/Minecraft-Server-Scanner/raw/main/ips')).arrayBuffer());
+  if (config.customIps) {
+    serverList = fs.readFileSync(config.ipsPath);
+  } else {
+    serverList = Buffer.from(await (await fetch('https://github.com/kgurchiek/Minecraft-Server-Scanner/raw/main/ips')).arrayBuffer());
+  }
   totalServers = serverList.length / 6;
   console.log(`Total servers: ${totalServers}`);
   var serversPinged = 0;
   var startTime = new Date();
   var operations = [];
+  var writeStream = config.writeToFile ? fs.createWriteStream('./results') : null;
+  if (config.writeToFile) writeStream.write('[')
   
   // start randomly within the list to vary which servers come first, since packet loss gets worse futher into the scan
-  var startNum = Math.round(Math.random() * Math.floor(totalServers / maxPings)) * maxPings;
-  if (startNum == 0) startNum = maxPings;
+  var startNum = Math.round(Math.random() * Math.floor(totalServers / config.maxPings)) * config.maxPings;
+  if (startNum == 0) startNum = config.maxPings;
 
   function getServer(i) {
     const ip = `${serverList[i * 6]}.${serverList[(i * 6) + 1]}.${serverList[(i * 6) + 2]}.${serverList[(i * 6) + 3]}`;
@@ -37,15 +43,13 @@ async function main() {
     serversPinged++;
     if (serversPinged % 20000 == 0) console.log(serversPinged);
     try {
-      const response = await MinecraftServerListPing.ping(0, server.ip, server.port, pingTimeout);
+      const response = await MinecraftServerListPing.ping(0, server.ip, server.port, config.pingTimeout);
       if (typeof response === 'object') {
         const lastSeen = Math.floor((new Date()).getTime() / 1000);
         newObj = {
           ip: server.ip,
           port: server.port,
           version: response.version,
-          'players.max': response.players.max, 
-          'players.online': response.players.online,
           description: response.description,
           enforcesSecureChat: response.enforcesSecureChat,
           hasFavicon: response.favicon != null,
@@ -70,38 +74,57 @@ async function main() {
         if (org != null) newObj['org'] = org.autonomous_system_organization;
 
         //scannedServers.updateOne({ ip: server.ip, port: server.port }, { $set: newObj }, { upsert: true } )
-        operations.push({
-          updateOne: {
-            filter: { ip: server.ip, port: server.port },
-            update: { $set: newObj },
-            upsert: true
+        if (config.saveToMongo) {
+          newObj['players.max'] = response.players.max, 
+          newObj['players.online'] = response.players.online,
+          operations.push({
+            updateOne: {
+              filter: { ip: server.ip, port: server.port },
+              update: { $set: newObj },
+              upsert: true
+            }
+          });
+          if (Array.isArray(response.players.sample)) {
+            for (const player of response.players.sample) {
+              player['lastSeen'] = lastSeen;
+              operations.push({
+                updateOne: { 
+                  filter: { ip: server.ip, "port": server.port }, 
+                  update: { "$pull": { "players.sample": { name: player.name, id: player.id } } }
+                }
+              });
+              operations.push({
+                updateOne: { 
+                  filter: { ip: server.ip, "port": server.port }, 
+                  update: { "$push": { "players.sample": player } }
+                }
+              });
+            }
           }
-        });
-        if (Array.isArray(response.players.sample)) {
-          for (const player of response.players.sample) {
-            player['lastSeen'] = lastSeen;
-            operations.push({
-              updateOne: { 
-                filter: { ip: server.ip, "port": server.port }, 
-                update: { "$pull": { "players.sample": { name: player.name, id: player.id } } }
-              }
-            });
-            operations.push({
-              updateOne: { 
-                filter: { ip: server.ip, "port": server.port }, 
-                update: { "$push": { "players.sample": player } }
-              }
-            });
-          }
-        }
 
-        if (operations.length >= 3000) {
-          console.log('Writing to db');
-          scannedServers.bulkWrite(operations)
-          .catch(err => {
-            console.log(err);
-          })
-          operations = [];
+          if (operations.length >= 3000) {
+            console.log('Writing to db');
+            scannedServers.bulkWrite(operations)
+            .catch(err => {
+              console.log(err);
+            })
+            operations = [];
+          }
+        } else if (config.writeToFile) {
+          newObj.players = response.players;
+          if (config.compressed) {
+            const splitIP = newObj.ip.split('.');
+            writeStream.write(Buffer.from([
+              parseInt(splitIP[0]),
+              parseInt(splitIP[1]),
+              parseInt(splitIP[2]),
+              parseInt(splitIP[3]),
+              Math.floor(newObj.port / 256),
+              newObj.port % 256
+            ]));
+          } else {
+            writeStream.write('\n' + JSON.stringify(newObj));
+          }
         }
       }
     } catch (error) {
@@ -111,40 +134,46 @@ async function main() {
 
   function scanBatch(i) {
     if (i >= startNum) {
-      if (i + maxPings < totalServers) {
+      if (i + config.maxPings < totalServers) {
         // scan through the end of the server list
-        for (var j = i; j < i + maxPings; j++) {
+        for (var j = i; j < i + config.maxPings; j++) {
           pingServer(getServer(j))
         }
-        setTimeout(function() { scanBatch(i + maxPings) }, pingDelay);
+        setTimeout(function() { scanBatch(i + config.maxPings) }, config.pingDelay);
       } else {
         // once the end of the list is reached, restart at the beginning
         for (var j = i; j < totalServers; j++) {
           pingServer(getServer(j))
         }
-        setTimeout(function() { scanBatch(0) }, pingDelay);
+        setTimeout(function() { scanBatch(0) }, config.pingDelay);
       }
     } else {
       // scan up to the server that was started with (after restarting at the beginning)
-      if (i + maxPings < startNum) {
-        for (var j = i; j < i + maxPings; j++) {
+      if (i + config.maxPings < startNum) {
+        for (var j = i; j < i + config.maxPings; j++) {
           pingServer(getServer(j))
         }
-        setTimeout(function() { scanBatch(i + maxPings) }, pingDelay);
+        setTimeout(function() { scanBatch(i + config.maxPings) }, config.pingDelay);
       } else {
         for (var j = i; j < startNum - i; j++) {
           pingServer(getServer(j))
         }
 
         // finish scan
-        console.log('Writing to db');
-        scannedServers.bulkWrite(operations)
-        .catch(err => {
-          console.log(err);
-        })
-        operations = [];
+        if (config.saveToMongo) {
+          console.log('Writing to db');
+          scannedServers.bulkWrite(operations)
+          .catch(err => {
+            console.log(err);
+          })
+          operations = [];
+        }
+        if (config.writeToFile) {
+          if (!config.compressed) writeStream.write(']');
+          writeStream.end();
+        }
         console.log(`Finished scanning in ${(new Date() - startTime) / 1000} seconds at ${new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" })}.`);
-        setTimeout(function(){ main() }, scanDelay)
+        if (config.repeat) setTimeout(function(){ main() }, config.repeatDelay)
       }
     }
   }
