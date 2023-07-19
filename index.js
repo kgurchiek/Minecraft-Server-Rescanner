@@ -8,7 +8,7 @@ if (config.saveToMongo) {
   const client = new MongoClient(config.mongoURI);
   scannedServers = client.db("MCSS").collection(config.dbName);
 }
-var fs = config.writeToFile ? fs = require('fs') : null;
+var fs = config.writeToFile || config.customIps ? fs = require('fs') : null;
 var serverList;
 var totalServers;
 
