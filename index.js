@@ -12,6 +12,10 @@ var fs = config.saveToFile || config.customIps ? fs = require('fs') : null;
 var serverList;
 var totalServers;
 
+process.on('uncaughtException', function(err) {
+  console.log('Caught exception: ' + err);
+});
+
 async function main() {
   const cityLookup = await maxmind.open('./GeoLite2-City.mmdb');
   const asnLookup = await maxmind.open('./GeoLite2-ASN.mmdb');
