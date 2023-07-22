@@ -4,7 +4,7 @@ Used to gather updated info from https://github.com/kgurchiek/Minecraft-Server-S
 ## Usage
 First, set up a Mongo database. You can have one hosted for free at https://www.mongodb.com/cloud/atlas. Then put its URI into config.json.
 
-Install the required npm packages with the following command: `npm install minecraft-status, mongodb`.
+Install the required npm packages with the following command: `npm install maxmind net varint`. If you have `saveToMongo` enabled in your config, then also run `npm install mongodb`
 
 The script will write all ping results to the collection specified in the config file.
 
