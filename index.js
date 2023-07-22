@@ -1,7 +1,7 @@
 // Fetches dependencies and inits variables
 const config = require('./config.json');
-const maxmind = require('maxmind');
-const { pingServer } = require('./ping.js');
+const { MinecraftServerListPing } = require("minecraft-status");
+var maxmind = require('maxmind');
 var scannedServers;
 if (config.saveToMongo) {
   const MongoClient = require('mongodb').MongoClient;
@@ -47,7 +47,7 @@ async function main() {
     serversPinged++;
     if (serversPinged % 20000 == 0) console.log(serversPinged);
     try {
-      const response = await pingServer(server.ip, server.port, 0, config.pingTimeout);
+      const response = await MinecraftServerListPing.ping(0, server.ip, server.port, config.pingTimeout);
       if (typeof response === 'object') {
         const lastSeen = Math.floor((new Date()).getTime() / 1000);
         newObj = {
