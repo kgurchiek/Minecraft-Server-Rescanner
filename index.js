@@ -1,7 +1,7 @@
 // Fetches dependencies and inits variables
 const config = require('./config.json');
 const maxmind = require('maxmind');
-const { ping } = require('./ping.js');
+const { pingServer } = require('./ping.js');
 var scannedServers;
 if (config.saveToMongo) {
   const MongoClient = require('mongodb').MongoClient;
@@ -33,7 +33,7 @@ async function main() {
   if (config.saveToFile) writeStream.write('[')
   
   // start randomly within the list to vary which servers come first, since packet loss gets worse futher into the scan
-  var startNum = Math.floor(Math.random() * Math.floor(totalServers / config.maxPings)) * config.maxPings;
+  var startNum = Math.round(Math.random() * Math.floor(totalServers / config.maxPings)) * config.maxPings;
   if (startNum == 0) startNum = config.maxPings;
 
   function getServer(i) {
@@ -47,7 +47,7 @@ async function main() {
     serversPinged++;
     if (serversPinged % 20000 == 0) console.log(serversPinged);
     try {
-      const response = await ping(server.ip, server.port, 0, config.pingTimeout);
+      const response = await pingServer(server.ip, server.port, 0, config.pingTimeout);
       if (typeof response === 'object') {
         const lastSeen = Math.floor((new Date()).getTime() / 1000);
         newObj = {

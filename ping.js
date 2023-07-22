@@ -2,7 +2,7 @@ const net = require('net');
 const varint = require('varint');
 
 module.exports = {
-  ping: (ip, port, protocol, timeout) => {
+  pingServer: (ip, port, protocol, timeout) => {
     return new Promise((resolve, reject) => {
       var jsonLength = 0;
 
