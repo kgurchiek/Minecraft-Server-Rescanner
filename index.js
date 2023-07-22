@@ -13,7 +13,7 @@ var serverList;
 var totalServers;
 
 process.on('uncaughtException', function(err) {
-  console.log('Caught exception: ' + err);
+  //console.log('Caught exception: ' + err);
 });
 
 async function main() {

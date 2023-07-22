@@ -7,7 +7,10 @@ module.exports = {
       var jsonLength = 0;
 
       setTimeout(function() {
-        if (!hasResponded) resolve('timeout');
+        if (!hasResponded) {
+          resolve('timeout');
+          client.destroy();
+        }
       }, timeout);
 
       var hasResponded = false;
