@@ -2,7 +2,11 @@
 Used to gather updated info from https://github.com/kgurchiek/Minecraft-Server-Scanner
 
 ## Usage
-Install the required npm packages with the following command: `npm install maxmind net varint`. If you have `saveToMongo` enabled in your config, then also run `npm install mongodb`. Then configure `config.json` to your liking, and run `index.js`.
+First, set up a Mongo database. You can have one hosted for free at https://www.mongodb.com/cloud/atlas. Then put its URI into config.json.
+
+Install the required npm packages with the following command: `npm install maxmind net varint`. If you have `saveToMongo` enabled in your config, then also run `npm install mongodb`
+
+The script will write all ping results to the collection specified in the config file.
 
 ## Configs
 - **saveToMongo:** Whether or not to write results to a mongodb
