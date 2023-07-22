@@ -1,3 +1,4 @@
+const { time } = require('console');
 const net = require('net');
 const varint = require('varint');
 
