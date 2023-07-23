@@ -47,7 +47,12 @@ module.exports = {
             resolve('error');
           }
           const varint1Length = varint.decode.bytes;
-          jsonLength = varint.decode(data.subarray(varint1Length + 1))
+          try {
+            jsonLength = varint.decode(data.subarray(varint1Length + 1));
+          } catch (error) {
+            //console.log(`varint error on ${ip}:${port} - ${error}`);
+            resolve('error');
+          }
           const varint2Length = varint.decode.bytes;
           data = data.subarray(varint1Length + 1 + varint2Length);
         }
