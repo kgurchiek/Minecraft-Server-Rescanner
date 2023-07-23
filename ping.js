@@ -53,7 +53,7 @@ module.exports = {
           try {
            resolve(JSON.parse(response));
           } catch (error) {
-            console.log(`Error on ${ip}:${port} - ${error}`);
+            //console.log(`Error on ${ip}:${port} - ${error}`);
             resolve('error');
           }
           hasResponded = true;
