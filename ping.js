@@ -40,7 +40,12 @@ module.exports = {
 
       client.on('data', (data) => {
         if (jsonLength == 0) {
-          varint.decode(data);
+          try {
+            varint.decode(data);
+          } catch (error) {
+            //console.log(`varint error on ${ip}:${port} - ${error}`);
+            resolve('error');
+          }
           const varint1Length = varint.decode.bytes;
           jsonLength = varint.decode(data.subarray(varint1Length + 1))
           const varint2Length = varint.decode.bytes;
