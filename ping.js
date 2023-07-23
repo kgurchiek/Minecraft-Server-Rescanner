@@ -50,7 +50,12 @@ module.exports = {
 
         if (Buffer.byteLength(response) >= jsonLength) {
           client.destroy();
-          resolve(JSON.parse(response));
+          try {
+           resolve(JSON.parse(response));
+          } catch (error) {
+            console.log(`Error on ${ip}:${port} - ${error}`);
+            resolve('error');
+          }
           hasResponded = true;
         }
       });
