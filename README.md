@@ -27,3 +27,6 @@ The script will write all ping results to the collection specified in the config
 
 ## How It Works
 The code from https://github.com/kgurchiek/Minecraft-Server-Scanner is being constantly run, updating the ips file. This code gets the file from github and rescans those ips to get updated information.
+
+# Information
+This product includes GeoLite2 data created by MaxMind, available from https://www.maxmind.com.
