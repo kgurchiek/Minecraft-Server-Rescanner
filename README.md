@@ -1,6 +1,9 @@
 # Minecraft Server Rescanner
 Used to gather updated info from https://github.com/kgurchiek/Minecraft-Server-Scanner
 
+## Information
+This product includes GeoLite2 data created by MaxMind, available from https://www.maxmind.com
+
 ## Usage
 First, set up a Mongo database. You can have one hosted for free at https://www.mongodb.com/cloud/atlas. Then put its URI into config.json.
 
