@@ -120,7 +120,7 @@ async function main() {
           }
         });
 
-        if (operations.length >= 3000) {
+        if (operations.length >= (config.ping ? 3000 : 1000) {
           console.log('Writing to db');
           scannedServers.bulkWrite(operations)
           .catch(err => {
