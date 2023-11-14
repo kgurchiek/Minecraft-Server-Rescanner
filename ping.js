@@ -128,7 +128,6 @@ module.exports = {
     
       client.on('data', async (data) => {
         client.destroy(); // kill client after server's response
-        ping(ip, port, protocol, () => {}) // add server to db
         resolve(data[1] != 1);
         hasResponded = true;
       });
