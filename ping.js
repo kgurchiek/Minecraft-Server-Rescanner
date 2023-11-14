@@ -83,7 +83,7 @@ module.exports = {
         client.destroy();
       }, timeout);
       
-      const mcData = minecraftData(version);
+      const mcData = minecraftData(protocol);
       const username = `CrackedTest${Math.round(Math.random() * 1000)}`;
       var hasResponded = false;
     
