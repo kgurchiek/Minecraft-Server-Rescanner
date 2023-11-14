@@ -52,7 +52,7 @@ async function main() {
       const response = await ping(server.ip, server.port, 0, config.pingTimeout);
       if (config.ping && typeof response === 'object') {
         const lastSeen = Math.floor((new Date()).getTime() / 1000);
-        if (!(config.saveToMongo && config.saveToFile && config.compressed) && config.ping) {
+        if (!(!config.saveToMongo && config.saveToFile && config.compressed) && config.ping) {
           newObj = {
             ip: server.ip,
             port: server.port,
@@ -82,7 +82,7 @@ async function main() {
         }
       }
 
-      if (config.auth && !(config.saveToMongo && config.saveToFile && config.compressed)) {
+      if (config.auth && !(!config.saveToMongo && config.saveToFile && config.compressed)) {
         const auth = await authCheck(server.ip, server.port, minecraftData(response.verson.protocol), config.pingTimeout) == null ? 763 : response.version.protocol;
         if (auth != 'timeout') newObj.cracked = auth;
       }
