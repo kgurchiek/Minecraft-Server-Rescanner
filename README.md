@@ -9,6 +9,8 @@ Install the required npm packages with the following command: `npm install minec
 The script will write all ping results to the collection specified in the config file.
 
 ## Configs
+- **ping:** Whether or not to status ping the server
+- **auth:** Whether or not to check for the authentication mode (online or cracked) of the server
 - **saveToMongo:** Whether or not to write results to a mongodb
 - **mongoURI:** The URI used to connect to your Mongo database \(only used if `saveToMongo` is set to `true`\)
 - **collectionName:** The name of the collection you want to save the results in \(only used if `saveToMongo` is set to `true`\)

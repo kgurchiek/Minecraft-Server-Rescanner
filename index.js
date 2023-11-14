@@ -1,7 +1,8 @@
 // Fetches dependencies and inits variables
 const config = require('./config.json');
 const maxmind = require('maxmind');
-const { ping } = require('./ping.js');
+const minecraftData = require('minecraft-data');
+const { ping, authCheck } = require('./ping.js');
 var scannedServers;
 if (config.saveToMongo) {
   const MongoClient = require('mongodb').MongoClient;
@@ -30,7 +31,7 @@ async function main() {
   var startTime = new Date();
   var operations = [];
   var writeStream = config.saveToFile ? fs.createWriteStream('./results') : null;
-  if (config.saveToFile) writeStream.write('[')
+  if (config.saveToFile && !config.compressed) writeStream.write('[')
   
   // start randomly within the list to vary which servers come first, since packet loss gets worse futher into the scan
   var startNum = Math.floor(Math.random() * Math.floor(totalServers / config.maxPings)) * config.maxPings;
@@ -47,88 +48,96 @@ async function main() {
     serversPinged++;
     if (serversPinged % 20000 == 0) console.log(serversPinged);
     try {
+      var newObj = {};
       const response = await ping(server.ip, server.port, 0, config.pingTimeout);
-      if (typeof response === 'object') {
+      if (config.ping && typeof response === 'object') {
         const lastSeen = Math.floor((new Date()).getTime() / 1000);
-        newObj = {
-          ip: server.ip,
-          port: server.port,
-          version: response.version,
-          description: response.description,
-          enforcesSecureChat: response.enforcesSecureChat,
-          hasFavicon: response.favicon != null,
-          hasForgeData: response.forgeData != null,
-          lastSeen: lastSeen
-        }
-        var location = await cityLookup.get(server.ip);
-        if (location != null) {
-          newObj['geo'] = {};
-          if (location.country != null) {
-            newObj['geo']['country'] = location.country.iso_code;
-          } else {
-            newObj['geo']['country'] = location.registered_country.iso_code;
+        if (!(config.saveToMongo && config.saveToFile && config.compressed) && config.ping) {
+          newObj = {
+            ip: server.ip,
+            port: server.port,
+            version: response.version,
+            description: response.description,
+            enforcesSecureChat: response.enforcesSecureChat,
+            hasFavicon: response.favicon != null,
+            hasForgeData: response.forgeData != null,
+            lastSeen: lastSeen
           }
-          if (location.city != null) {
-            newObj['geo']['city'] = location.city.names.en;
-            newObj['geo']['lat'] = location.location.latitude;
-            newObj['geo']['lon'] = location.location.longitude;
-          }
-        }
-        var org = await asnLookup.get(server.ip);
-        if (org != null) newObj['org'] = org.autonomous_system_organization;
-
-        //scannedServers.updateOne({ ip: server.ip, port: server.port }, { $set: newObj }, { upsert: true } )
-        if (config.saveToMongo) {
-          newObj['players.max'] = response.players.max, 
-          newObj['players.online'] = response.players.online,
-          operations.push({
-            updateOne: {
-              filter: { ip: server.ip, port: server.port },
-              update: { $set: newObj },
-              upsert: true
+          var location = cityLookup.get(server.ip);
+          if (location != null) {
+            newObj['geo'] = {};
+            if (location.country != null) {
+              newObj['geo']['country'] = location.country.iso_code;
+            } else {
+              newObj['geo']['country'] = location.registered_country.iso_code;
             }
-          });
-          if (Array.isArray(response.players.sample)) {
-            for (const player of response.players.sample) {
-              player['lastSeen'] = lastSeen;
-              operations.push({
-                updateOne: { 
-                  filter: { ip: server.ip, "port": server.port }, 
-                  update: { "$pull": { "players.sample": { name: player.name, id: player.id } } }
-                }
-              });
-              operations.push({
-                updateOne: { 
-                  filter: { ip: server.ip, "port": server.port }, 
-                  update: { "$push": { "players.sample": player } }
-                }
-              });
+            if (location.city != null) {
+              newObj['geo']['city'] = location.city.names.en;
+              newObj['geo']['lat'] = location.location.latitude;
+              newObj['geo']['lon'] = location.location.longitude;
             }
           }
+          var org = asnLookup.get(server.ip);
+          if (org != null) newObj['org'] = org.autonomous_system_organization;
+        }
+      }
 
-          if (operations.length >= 3000) {
-            console.log('Writing to db');
-            scannedServers.bulkWrite(operations)
-            .catch(err => {
-              console.log(err);
-            })
-            operations = [];
+      if (config.auth && !(config.saveToMongo && config.saveToFile && config.compressed)) {
+        const auth = await authCheck(server.ip, server.port, minecraftData(response.verson.protocol), config.pingTimeout) == null ? 763 : response.version.protocol;
+        if (auth != 'timeout') newObj.cracked = auth;
+      }
+
+      //scannedServers.updateOne({ ip: server.ip, port: server.port }, { $set: newObj }, { upsert: true } )
+      if (config.saveToMongo) {
+        newObj['players.max'] = response.players.max,
+        newObj['players.online'] = response.players.online,
+        operations.push({
+          updateOne: {
+            filter: { ip: server.ip, port: server.port },
+            update: { $set: newObj },
+            upsert: true
           }
-        } else if (config.saveToFile) {
-          newObj.players = response.players;
-          if (config.compressed) {
-            const splitIP = newObj.ip.split('.');
-            writeStream.write(Buffer.from([
-              parseInt(splitIP[0]),
-              parseInt(splitIP[1]),
-              parseInt(splitIP[2]),
-              parseInt(splitIP[3]),
-              Math.floor(newObj.port / 256),
-              newObj.port % 256
-            ]));
-          } else {
-            writeStream.write('\n' + JSON.stringify(newObj));
+        });
+        if (Array.isArray(response.players.sample)) {
+          for (const player of response.players.sample) {
+            player['lastSeen'] = lastSeen;
+            operations.push({
+              updateOne: { 
+                filter: { ip: server.ip, "port": server.port }, 
+                update: { "$pull": { "players.sample": { name: player.name, id: player.id } } }
+              }
+            });
+            operations.push({
+              updateOne: { 
+                filter: { ip: server.ip, "port": server.port }, 
+                update: { "$push": { "players.sample": player } }
+              }
+            });
           }
+        }
+
+        if (operations.length >= 3000) {
+          console.log('Writing to db');
+          scannedServers.bulkWrite(operations)
+          .catch(err => {
+            console.log(err);
+          })
+          operations = [];
+        }
+      } else if (config.saveToFile) {
+        newObj.players = response.players;
+        if (config.compressed) {
+          const splitIP = newObj.ip.split('.');
+          writeStream.write(Buffer.from([
+            parseInt(splitIP[0]),
+            parseInt(splitIP[1]),
+            parseInt(splitIP[2]),
+            parseInt(splitIP[3]),
+            Math.floor(newObj.port / 256),
+            newObj.port % 256
+          ]));
+        } else {
+          writeStream.write('\n' + JSON.stringify(newObj));
         }
       }
     } catch (error) {

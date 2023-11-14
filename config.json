@@ -1,4 +1,6 @@
 {
+  "ping": true,
+  "auth": false,
   "saveToMongo": false,
   "mongoURI": "URI HERE",
   "dbName": "scannedServers",
