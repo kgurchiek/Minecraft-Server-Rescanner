@@ -51,7 +51,8 @@ async function main() {
       var newObj = {};
       const response = await ping(server.ip, server.port, 0, config.pingTimeout);
       const lastSeen = Math.floor((new Date()).getTime() / 1000);
-      if (config.ping && typeof response === 'object') {
+      if (typeof response !== 'object') return;
+      if (config.ping) {
         if (!(!config.saveToMongo && config.saveToFile && config.compressed) && config.ping) {
           newObj = {
             ip: server.ip,
