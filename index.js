@@ -84,7 +84,7 @@ async function main() {
       }
 
       if (config.auth && !(!config.saveToMongo && config.saveToFile && config.compressed)) {
-        const auth = await authCheck(server.ip, server.port, minecraftData(response.verson.protocol), config.pingTimeout) == null ? 763 : response.version.protocol;
+        const auth = await authCheck(server.ip, server.port, minecraftData(response.verson.protocol) == null ? 763 : response.version.protocol, config.pingTimeout);
         if (auth != 'timeout') newObj.cracked = auth;
       }
 
