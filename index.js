@@ -17,6 +17,11 @@ process.on('uncaughtException', function(err) {
   //console.log('Caught exception: ' + err);
 });
 
+function timeout(func, delay, ms) {
+  if (ms >= delay) func();
+  else setTimeout(() => { timeout(func, delay, ms + 100) }, 100);
+}
+
 async function main() {
   const cityLookup = await maxmind.open('./GeoLite2-City.mmdb');
   const asnLookup = await maxmind.open('./GeoLite2-ASN.mmdb');
@@ -191,7 +196,7 @@ async function main() {
           writeStream.end();
         }
         console.log(`Finished scanning in ${(new Date() - startTime) / 1000} seconds at ${new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" })}.`);
-        if (config.repeat) setTimeout(function(){ main() }, config.repeatDelay)
+        if (config.repeat) timeout(main, config.repeatDelay, 0);
       }
     }
   }
