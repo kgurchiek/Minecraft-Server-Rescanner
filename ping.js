@@ -25,17 +25,13 @@ module.exports = {
           Buffer.from([ip.length]),
           Buffer.from(ip, 'utf-8'), // server address
           Buffer.from(new Uint16Array([port]).buffer).reverse(), // server port
-          Buffer.from([0x01]) // next state (2)
+          Buffer.from([0x01]), // next state (2)
+          Buffer.from([0x01]), // second packet length
+          Buffer.from([0x00]) // status request
         ]);
         var packetLength = Buffer.alloc(1);
-        packetLength.writeUInt8(handshakePacket.length);
+        packetLength.writeUInt8(handshakePacket.length - 2);
         var buffer = Buffer.concat([packetLength, handshakePacket]);
-        client.write(buffer);
-
-        const statusRequestPacket = Buffer.from([0x00]);
-        packetLength = Buffer.alloc(1);
-        packetLength.writeUInt8(statusRequestPacket.length);
-        buffer = Buffer.concat([packetLength, statusRequestPacket]);
         client.write(buffer);
       });
 
