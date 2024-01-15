@@ -25,14 +25,11 @@ function timeout(func, delay, ms) {
 async function main() {
   const cityLookup = await maxmind.open('./GeoLite2-City.mmdb');
   const asnLookup = await maxmind.open('./GeoLite2-ASN.mmdb');
-  if (config.customIps) {
-    serverList = fs.readFileSync(config.ipsPath);
-  } else {
-    serverList = Buffer.from(await (await fetch('https://github.com/kgurchiek/Minecraft-Server-Scanner/raw/main/ips')).arrayBuffer());
-  }
+  serverList = config.customIps ? fs.readFileSync(config.ipsPath) : Buffer.from(await (await fetch('https://github.com/kgurchiek/Minecraft-Server-Scanner/raw/main/ips')).arrayBuffer());
   totalServers = serverList.length / 6;
   console.log(`Total servers: ${totalServers}`);
   var serversPinged = 0;
+  var resultCount = 0;
   var startTime = new Date();
   var operations = [];
   var writeStream = config.saveToFile ? fs.createWriteStream('./results') : null;
@@ -57,6 +54,7 @@ async function main() {
       const response = await ping(server.ip, server.port, 0, config.pingTimeout);
       const lastSeen = Math.floor((new Date()).getTime() / 1000);
       if (typeof response !== 'object') return;
+      resultCount++;
       if (config.ping) {
         if (!(!config.saveToMongo && config.saveToFile && config.compressed) && config.ping) {
           newObj = {
@@ -195,7 +193,7 @@ async function main() {
           if (!config.compressed) writeStream.write(']');
           writeStream.end();
         }
-        console.log(`Finished scanning in ${(new Date() - startTime) / 1000} seconds at ${new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" })}.`);
+        console.log(`Finished scanning ${resultCount} servers in ${(new Date() - startTime) / 1000} seconds at ${new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" })}.`);
         if (config.repeat) timeout(main, config.repeatDelay, 0);
       }
     }
