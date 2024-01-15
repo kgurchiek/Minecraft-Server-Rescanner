@@ -41,14 +41,14 @@ module.exports = {
             varint.decode(data);
           } catch (error) {
             //console.log(`varint error on ${ip}:${port} - ${error}`);
-            resolve('error');
+            resolve(`error: ${error}`);
           }
           const varint1Length = varint.decode.bytes;
           try {
             jsonLength = varint.decode(data.subarray(varint1Length + 1));
           } catch (error) {
             //console.log(`varint error on ${ip}:${port} - ${error}`);
-            resolve('error');
+            resolve(`error: ${error}`);
           }
           const varint2Length = varint.decode.bytes;
           data = data.subarray(varint1Length + 1 + varint2Length);
@@ -60,8 +60,15 @@ module.exports = {
           try {
            resolve(JSON.parse(response));
           } catch (error) {
-            //console.log(`Error on ${ip}:${port} - ${error}`);
-            resolve('error');
+            error = error.toString();
+            if (error.startsWith('SyntaxError: Unexpected non-whitespace character')) {
+              try {
+                resolve(JSON.parse(response.substring(0, parseInt(error.substring(72, error.indexOf(' ', 72)))))); // fabric mods add a separate json to the end, this ignores it
+              } catch (error) {
+                //console.log(`Error on ${ip}:${port} - ${error}`);
+                resolve(`error: ${error} RESPONSE:${response.substring(0, error.substring(error.indexOf('position') + 9, error.indexOf(' ', error.indexOf('position') + 9)))}`);
+              }
+            }
           }
           hasResponded = true;
         }
