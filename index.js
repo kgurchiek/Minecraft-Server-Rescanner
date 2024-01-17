@@ -4,10 +4,12 @@ const maxmind = require('maxmind');
 const minecraftData = require('minecraft-data');
 const { ping, authCheck } = require('./ping.js');
 var scannedServers;
+var players;
 if (config.saveToMongo) {
   const MongoClient = require('mongodb').MongoClient;
   const client = new MongoClient(config.mongoURI);
-  scannedServers = client.db("MCSS").collection(config.dbName);
+  scannedServers = client.db(config.dbName).collection(config.serversCollectionName);
+  players = client.db(config.dbName).collection(config.playersCollectionName);
 }
 var fs = config.saveToFile || config.customIps ? fs = require('fs') : null;
 var serverList;
@@ -32,6 +34,7 @@ async function main() {
   var resultCount = 0;
   var startTime = new Date();
   var operations = [];
+  var playerOperations = [];
   var writeStream = config.saveToFile ? fs.createWriteStream('./results') : null;
   if (config.saveToFile && !config.compressed) writeStream.write('[')
   
@@ -93,26 +96,20 @@ async function main() {
 
       //scannedServers.updateOne({ ip: server.ip, port: server.port }, { $set: newObj }, { upsert: true } )
       if (config.saveToMongo) {
-        if (config.ping) {
-          newObj['players.max'] = response.players.max;
-          newObj['players.online'] = response.players.online;
-          
-          if (Array.isArray(response.players.sample)) {
-            for (const player of response.players.sample) {
-              player['lastSeen'] = lastSeen;
-              operations.push({
-                updateOne: { 
-                  filter: { ip: server.ip, "port": server.port }, 
-                  update: { "$pull": { "players.sample": { name: player.name, id: player.id } } }
-                }
-              });
-              operations.push({
-                updateOne: { 
-                  filter: { ip: server.ip, "port": server.port }, 
-                  update: { "$push": { "players.sample": player } }
-                }
-              });
-            }
+        if (config.players && Symbol.iterator in Object(server?.players?.sample)) {
+          for (player of server.players.sample) {
+            playerOperations.push({
+              updateOne: {
+                filter: { name: player.name, uuid: player.id },
+                update: { "$pull": { "servers": { ip: server.ip, port: server.port } } },
+              }
+            })
+            playerOperations.push({
+              updateOne: {
+                filter: { name: player.name, uuid: player.id },
+                update: { "$push": { "servers": { ip: server.ip, port: server.port,  lastSeen }}},
+              }
+            })
           }
         }
 
@@ -124,13 +121,18 @@ async function main() {
           }
         });
 
-        if (operations.length >= (config.ping ? 3000 : 1000)) {
-          console.log('Writing to db');
+        if (operations.length >= 1000) {
+          console.log('Writing servers to db');
           scannedServers.bulkWrite(operations)
-          .catch(err => {
-            console.log(err);
-          })
+          .catch(err => console.log(err))
           operations = [];
+        }
+
+        if (playerOperations.length >= 1000) {
+          console.log('Writing players to db');
+          players.bulkWrite(playerOperations)
+          .catch(err => console.log(err))
+          playerOperations = [];
         }
       } else if (config.saveToFile) {
         newObj.players = response.players;
@@ -184,10 +186,12 @@ async function main() {
         if (config.saveToMongo) {
           console.log('Writing to db');
           scannedServers.bulkWrite(operations)
-          .catch(err => {
-            console.log(err);
-          })
+          .catch(err => console.log(err))
           operations = [];
+
+          console.log('Writing players to db');
+          players.bulkWrite(playerOperations)
+          .catch(err => console.log(err))
         }
         if (config.saveToFile) {
           if (!config.compressed) writeStream.write(']');

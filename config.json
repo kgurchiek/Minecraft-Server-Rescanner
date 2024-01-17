@@ -1,9 +1,12 @@
 {
   "ping": true,
+  "players": true,
   "auth": false,
   "saveToMongo": false,
   "mongoURI": "URI HERE",
-  "dbName": "scannedServers",
+  "dbName": "MCSS",
+  "serversCollectionName": "scannedServers",
+  "playersCollectionName": "players",
   "saveToFile": true,
   "compressed": false,
   "repeat": false,
