@@ -97,7 +97,7 @@ async function main() {
       //scannedServers.updateOne({ ip: server.ip, port: server.port }, { $set: newObj }, { upsert: true } )
       if (config.saveToMongo) {
         if (config.players && Symbol.iterator in Object(response.players?.sample)) {
-          for (player of server.players.sample) {
+          for (player of response.players.sample) {
             playerOperations.push({
               updateOne: {
                 filter: { name: player.name, uuid: player.id },
