@@ -64,6 +64,7 @@ async function main() {
             ip: server.ip,
             port: server.port,
             version: response.version,
+            players: response.players,
             description: response.description,
             enforcesSecureChat: response.enforcesSecureChat,
             hasFavicon: response.favicon != null,
