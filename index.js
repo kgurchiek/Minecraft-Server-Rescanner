@@ -102,13 +102,8 @@ async function main() {
             playerOperations.push({
               updateOne: {
                 filter: { name: player.name, uuid: player.id },
-                update: { "$pull": { "servers": { ip: server.ip, port: server.port } } },
-              }
-            })
-            playerOperations.push({
-              updateOne: {
-                filter: { name: player.name, uuid: player.id },
-                update: { "$push": { "servers": { ip: server.ip, port: server.port,  lastSeen }}},
+                update: { $set: { name: player.name, uuid: player.id, `servers.${server.ip}:${server.port}`: { lastSeen } }},
+                upsert: true
               }
             })
           }
