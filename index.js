@@ -64,7 +64,7 @@ async function main() {
             ip: server.ip,
             port: server.port,
             version: response.version,
-            players: response.players,
+            players: { online: response.players.online, max: response.players.max },
             description: response.description,
             enforcesSecureChat: response.enforcesSecureChat,
             hasFavicon: response.favicon != null,
@@ -111,10 +111,13 @@ async function main() {
           }
         }
 
+        const update = { $set: newObj };
+        if (Symbol.iterator in Object(response.players?.sample)) for (player of response.players.sample) update.$set.players.sample[`${player.name.replaceAll('.', '')}:${player.id}`] = lastSeen;
+        update.$set.players[`history.${player.name}:${player.uuid}`] = lastSeen;
         operations.push({
           updateOne: {
             filter: { ip: server.ip, port: server.port },
-            update: { $set: newObj },
+            update,
             upsert: true
           }
         });
