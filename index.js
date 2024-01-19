@@ -99,10 +99,12 @@ async function main() {
       if (config.saveToMongo) {
         if (config.players && Symbol.iterator in Object(response.players?.sample)) {
           for (player of response.players.sample) {
+            const update = { $set: { name: player.name, uuid: player.id }};
+            update[`servers.${server.ip}:${server.port}`] = { lastSeen };
             playerOperations.push({
               updateOne: {
                 filter: { name: player.name, uuid: player.id },
-                update: { $set: { name: player.name, uuid: player.id, `servers.${server.ip}:${server.port}`: { lastSeen } }},
+                update,
                 upsert: true
               }
             })
