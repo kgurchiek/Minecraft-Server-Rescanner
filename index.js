@@ -112,8 +112,12 @@ async function main() {
         }
 
         const update = { $set: newObj };
-        if (Symbol.iterator in Object(response.players?.sample)) for (player of response.players.sample) update.$set.players.sample[`${player.name.replaceAll('.', '')}:${player.id}`] = lastSeen;
-        update.$set.players[`history.${player.name}:${player.uuid}`] = lastSeen;
+        if (Symbol.iterator in Object(response.players?.sample)) {
+          for (player of response.players.sample) {
+            update.$set.players.sample[`${player.name.replaceAll('.', '')}:${player.id}`] = lastSeen;
+            update.$set.players[`history.${player.name}:${player.uuid}`] = lastSeen;
+          }
+        }
         operations.push({
           updateOne: {
             filter: { ip: server.ip, port: server.port },
@@ -185,14 +189,19 @@ async function main() {
 
         // finish scan
         if (config.saveToMongo) {
-          console.log('Writing to db');
-          scannedServers.bulkWrite(operations)
-          .catch(err => console.log(err))
-          operations = [];
+          if (config.ping && operations.length > 0) {
+            console.log('Writing to db');
+            scannedServers.bulkWrite(operations)
+            .catch(err => console.log(err))
+            operations = [];
+          }
 
-          console.log('Writing players to db');
-          players.bulkWrite(playerOperations)
-          .catch(err => console.log(err))
+          if (config.players && playerOperations.length > 0) {
+            console.log('Writing players to db');
+            players.bulkWrite(playerOperations)
+            .catch(err => console.log(err))
+            playerOperations = [];
+          }
         }
         if (config.saveToFile) {
           if (!config.compressed) writeStream.write(']');
