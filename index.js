@@ -207,7 +207,7 @@ async function main() {
           if (!config.compressed) writeStream.write(']');
           writeStream.end();
         }
-        console.log(`Finished scanning ${resultCount} servers in ${(new Date() - startTime) / 1000} seconds at ${new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" })}.`);
+        console.log(`Finished scanning ${resultCount} servers in ${(new Date() - startTime) / 1000} seconds at ${new Date().toLocaleString()}.`);
         if (config.repeat) timeout(main, config.repeatDelay, 0);
       }
     }
