@@ -92,7 +92,7 @@ async function main() {
 
       if (config.auth && !(!config.saveToMongo && config.saveToFile && config.compressed)) {
         const auth = await authCheck(server.ip, server.port, minecraftData(response.version.protocol) == null ? 763 : response.version.protocol, config.pingTimeout);
-        if (auth != 'timeout') newObj.cracked = auth;
+        if (typeof auth != 'string') newObj.cracked = auth;
       }
 
       //scannedServers.updateOne({ ip: server.ip, port: server.port }, { $set: newObj }, { upsert: true } )
