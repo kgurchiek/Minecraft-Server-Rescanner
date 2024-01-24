@@ -126,14 +126,14 @@ async function main() {
           }
         });
 
-        if (operations.length >= 3000) {
+        if (operations.length >= 20000) {
           console.log('Writing servers to db');
           scannedServers.bulkWrite(operations)
           .catch(err => console.log(err))
           operations = [];
         }
 
-        if (playerOperations.length >= 1000) {
+        if (playerOperations.length >= 7000) {
           console.log('Writing players to db');
           players.bulkWrite(playerOperations)
           .catch(err => console.log(err))
