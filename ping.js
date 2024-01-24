@@ -33,7 +33,7 @@ module.exports = {
       try {
         resolve(JSON.parse(response));
       } catch (error) {
-        console.log(error.toString(), response)
+        //console.log(error.toString(), response)
         resolve('error');
       }
     })
