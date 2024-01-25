@@ -25,7 +25,7 @@ module.exports = (ip, port, packet, timeout = 5000) => {
         try {
           length = varint.decode(newData);
           newData = newData.subarray(varint.decode.bytes);
-        } else {
+        } catch (error) {
           length = 0;
           newData = Buffer.alloc(0);
           client.destroy();
