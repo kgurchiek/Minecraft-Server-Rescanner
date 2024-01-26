@@ -15,10 +15,6 @@ var fs = config.saveToFile || config.customIps ? fs = require('fs') : null;
 var serverList;
 var totalServers;
 
-process.on('uncaughtException', function(err) {
-  //console.log('Caught exception: ' + err);
-});
-
 function timeout(func, delay, ms) {
   if (ms >= delay) func();
   else setTimeout(() => { timeout(func, delay, ms + 100) }, 100);
@@ -114,8 +110,9 @@ async function main() {
         const update = { $set: newObj };
         if (Symbol.iterator in Object(response.players?.sample)) {
           for (player of response.players.sample) {
-            update.$set.players.sample[`${player.name.replaceAll('.', '')}:${player.id}`] = lastSeen;
+            update.$set.players[`sample.${player.name.replaceAll('.', '')}:${player.id}`] = lastSeen;
             update.$set.players[`history.${player.name}:${player.uuid}`] = lastSeen;
+            console.log(server.ip, server.port, update)
           }
         }
         operations.push({
