@@ -112,7 +112,6 @@ async function main() {
           for (player of response.players.sample) {
             update.$set.players[`sample.${player.name.replaceAll('.', '')}:${player.id}`] = lastSeen;
             update.$set.players[`history.${player.name}:${player.uuid}`] = lastSeen;
-            console.log(server.ip, server.port, update)
           }
         }
         operations.push({
