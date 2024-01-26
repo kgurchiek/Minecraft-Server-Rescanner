@@ -108,7 +108,10 @@ async function main() {
         }
 
         const update = { $set: newObj };
-        if (Symbol.iterator in Object(response.players?.sample)) for (player of response.players.sample) update.$set.players[`history.${player.name.replaceAll(' ', '')}:${player.id}`] = lastSeen;
+        if (Symbol.iterator in Object(response.players?.sample) && Object.keys(response.players.sample).length > 0) {
+          update.$set.players.history = {};
+          for (player of response.players.sample) update.$set.players.history[`${player.name.replaceAll(' ', '')}:${player.id}`] = lastSeen;
+        }
         operations.push({
           updateOne: {
             filter: { ip: server.ip, port: server.port },
