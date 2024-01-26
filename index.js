@@ -95,11 +95,11 @@ async function main() {
       if (config.saveToMongo) {
         if (config.players && Symbol.iterator in Object(response.players?.sample)) {
           for (player of response.players.sample) {
-            const update = { $set: { name: player.name, uuid: player.id }};
+            const update = { $set: { name: player.name.replaceAll(' ', ''), uuid: player.id }};
             update.$set[`servers.${server.ip.replaceAll('.', '_')}:${server.port}`] = { lastSeen };
             playerOperations.push({
               updateOne: {
-                filter: { name: player.name, uuid: player.id },
+                filter: { name: player.name.replaceAll(' ', ''), uuid: player.id },
                 update,
                 upsert: true
               }
@@ -108,7 +108,7 @@ async function main() {
         }
 
         const update = { $set: newObj };
-        if (Symbol.iterator in Object(response.players?.sample)) for (player of response.players.sample) update.$set.players[`history.${player.name}:${player.id}`] = lastSeen;
+        if (Symbol.iterator in Object(response.players?.sample)) for (player of response.players.sample) update.$set.players[`history.${player.name.replaceAll(' ', '')}:${player.id}`] = lastSeen;
         operations.push({
           updateOne: {
             filter: { ip: server.ip, port: server.port },
