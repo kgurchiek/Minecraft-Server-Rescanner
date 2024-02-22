@@ -6,7 +6,7 @@
   "mongoURI": "URI HERE",
   "dbName": "MCSS",
   "collectionName": "scannedServers",
-  "saveToFile": true,
+  "saveToFile": false,
   "compressed": false,
   "repeat": false,
   "repeatDelay": 300000,
