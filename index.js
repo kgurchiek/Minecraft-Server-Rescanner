@@ -7,9 +7,7 @@ var scannedServers;
 var players;
 if (config.saveToMongo) {
   const MongoClient = require('mongodb').MongoClient;
-  const client = new MongoClient(config.mongoURI);
-  scannedServers = client.db(config.dbName).collection(config.serversCollectionName);
-  players = client.db(config.dbName).collection(config.playersCollectionName);
+  scannedServers = new MongoClient(config.mongoURI).db(config.dbName).collection(config.collectionName);
 }
 var fs = config.saveToFile || config.customIps ? fs = require('fs') : null;
 var serverList;
@@ -60,7 +58,6 @@ async function main() {
             ip: server.ip,
             port: server.port,
             version: response.version,
-            players: response.players,
             description: response.description,
             enforcesSecureChat: response.enforcesSecureChat,
             hasFavicon: response.favicon != null,
@@ -93,47 +90,47 @@ async function main() {
 
       //scannedServers.updateOne({ ip: server.ip, port: server.port }, { $set: newObj }, { upsert: true } )
       if (config.saveToMongo) {
-        if (config.players && Symbol.iterator in Object(response.players?.sample)) {
-          for (player of response.players.sample) {
-            const update = { $set: { name: player.name.replaceAll(' ', ''), uuid: player.id }};
-            update.$set[`servers.${server.ip.replaceAll('.', '_')}:${server.port}`] = { lastSeen };
-            playerOperations.push({
-              updateOne: {
-                filter: { name: player.name.replaceAll(' ', ''), uuid: player.id },
-                update,
-                upsert: true
-              }
-            })
+        if (config.ping) {
+          newObj['players.max'] = response.players.max;
+          newObj['players.online'] = response.players.online;
+          
+          if (Array.isArray(response.players.sample)) {
+            for (const player of response.players.sample) {
+              player['lastSeen'] = lastSeen;
+              operations.push({
+                updateOne: { 
+                  filter: { ip: server.ip, 'port': server.port }, 
+                  update: { '$pull': { 'players.sample': { name: player.name, id: player.id } } }
+                }
+              });
+              operations.push({
+                updateOne: { 
+                  filter: { ip: server.ip, 'port': server.port }, 
+                  update: { '$push': { 'players.sample': player } }
+                }
+              });
+            }
           }
         }
 
-        const update = { $set: newObj };
-        if (Symbol.iterator in Object(response.players?.sample) && Object.keys(response.players.sample).length > 0) {
-          update.$set.players.history = {};
-          for (player of response.players.sample) update.$set.players.history[`${player.name.replaceAll(' ', '')}:${player.id}`] = lastSeen;
-        }
         operations.push({
           updateOne: {
             filter: { ip: server.ip, port: server.port },
-            update,
+            update: { $set: newObj },
             upsert: true
           }
         });
 
-        if (operations.length >= 20000) {
-          console.log('Writing servers to db');
+        if (operations.length >= (config.ping ? 3000 : 1000)) {
+          console.log('Writing to db');
           scannedServers.bulkWrite(operations)
-          .catch(err => console.log(err))
+          .catch(err => {
+            console.log(err);
+          })
           operations = [];
         }
-
-        if (playerOperations.length >= 7000) {
-          console.log('Writing players to db');
-          players.bulkWrite(playerOperations)
-          .catch(err => console.log(err))
-          playerOperations = [];
-        }
-      } else if (config.saveToFile) {
+      }
+      if (config.saveToFile) {
         newObj.players = response.players;
         if (config.compressed) {
           const splitIP = newObj.ip.split('.');
@@ -207,7 +204,7 @@ async function main() {
     }
   }
 
-  console.log("Starting search...");
+  console.log('Starting search...');
   scanBatch(startNum);
 }
 
