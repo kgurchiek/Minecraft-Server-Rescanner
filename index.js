@@ -31,7 +31,7 @@ async function main() {
   var playerOperations = [];
   var writeStream = config.saveToFile ? fs.createWriteStream('./results') : null;
   if (config.saveToFile && !config.compressed) writeStream.write('[')
-  
+
   // start randomly within the list to vary which servers come first, since packet loss gets worse futher into the scan
   var startNum = Math.floor(Math.random() * Math.floor(totalServers / config.maxPings)) * config.maxPings;
   if (startNum == 0) startNum = config.maxPings;
@@ -50,6 +50,7 @@ async function main() {
       var newObj = {};
       const response = await ping(server.ip, server.port, 0, config.pingTimeout);
       const lastSeen = Math.floor((new Date()).getTime() / 1000);
+      const dbValue = await scannedServers.findOne({ ip: server.ip, port: server.port });
       if (typeof response !== 'object') return;
       resultCount++;
       if (config.ping) {
@@ -90,45 +91,68 @@ async function main() {
 
       //scannedServers.updateOne({ ip: server.ip, port: server.port }, { $set: newObj }, { upsert: true } )
       if (config.saveToMongo) {
+        const sample = dbValue == null ? [] : dbValue.players.sample;
         if (config.ping) {
           newObj['players.max'] = response.players.max;
           newObj['players.online'] = response.players.online;
-          
+
           if (Array.isArray(response.players.sample)) {
             for (const player of response.players.sample) {
               player['lastSeen'] = lastSeen;
-              operations.push({
-                updateOne: { 
-                  filter: { ip: server.ip, 'port': server.port }, 
-                  update: { '$pull': { 'players.sample': { name: player.name, id: player.id } } }
+
+              // update the database value or add a new one
+              if (sample.length > 0) {
+                const index = sample.findIndex(p => p.name === player.name);
+                if (index !== -1) {
+                  sample[index] = player;
+                } else {
+                  sample.push(player);
                 }
-              });
-              operations.push({
-                updateOne: { 
-                  filter: { ip: server.ip, 'port': server.port }, 
-                  update: { '$push': { 'players.sample': player } }
-                }
-              });
+              } else {
+                sample.push(player);
+              }
             }
           }
         }
 
-        operations.push({
-          updateOne: {
-            filter: { ip: server.ip, port: server.port },
-            update: { $set: newObj },
-            upsert: true
+        // updates the database document with the new values
+        const pipeline = [
+          {
+            '$match': {
+              '$and': [
+                {
+                  'ip': server.ip
+                }, {
+                  'port': server.port
+                }
+              ]
+            }
+          }, {
+            '$set': {
+              'players.sample': sample,
+            }
+          }, {
+            '$merge': {
+              'into': {
+                'db': 'MCSS',
+                'coll': 'scannedServers'
+              },
+              'on': '_id',
+              'whenMatched': 'replace',
+              'whenNotMatched': 'insert'
+            }
           }
-        });
+        ];
 
-        if (operations.length >= (config.ping ? 15000 : 5000)) {
-          console.log('Writing to db');
-          scannedServers.bulkWrite(operations)
-          .catch(err => {
-            console.log(err);
-          })
-          operations = [];
-        }
+        // batching is no longer necessary and this was not implemented correctly
+        // if (operations.length >= (config.ping ? 15000 : 5000)) {
+
+        console.log('Writing to db');
+        scannedServers.aggregate(pipeline)
+            .catch(err => {
+              console.log(err);
+            })
+        operations = [];
       }
       if (config.saveToFile) {
         newObj.players = response.players;
@@ -183,14 +207,14 @@ async function main() {
           if (config.ping && operations.length > 0) {
             console.log('Writing to db');
             scannedServers.bulkWrite(operations)
-            .catch(err => console.log(err))
+                .catch(err => console.log(err))
             operations = [];
           }
 
           if (config.players && playerOperations.length > 0) {
             console.log('Writing players to db');
             players.bulkWrite(playerOperations)
-            .catch(err => console.log(err))
+                .catch(err => console.log(err))
             playerOperations = [];
           }
         }
