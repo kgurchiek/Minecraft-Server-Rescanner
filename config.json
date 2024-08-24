@@ -10,6 +10,7 @@
   "compressed": false,
   "repeat": false,
   "repeatDelay": 300000,
+  "authRepeatDelay": 86400000,
   "maxPings": 2000,
   "pingTimeout": 3000,
   "pingDelay": 3000,

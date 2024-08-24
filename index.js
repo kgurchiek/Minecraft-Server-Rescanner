@@ -12,13 +12,14 @@ if (config.saveToMongo) {
 var fs = config.saveToFile || config.customIps ? fs = require('fs') : null;
 var serverList;
 var totalServers;
+var lastAuth = 0;
 
 function timeout(func, delay, ms) {
-  if (ms >= delay) func();
+  if (ms >= delay) func(config.auth && new Date().getTime >= lastAuth + config.authRepeatDelay);
   else setTimeout(() => { timeout(func, delay, ms + 100) }, 100);
 }
 
-async function main() {
+async function main(scanAuth = false) {
   const cityLookup = await maxmind.open('./GeoLite2-City.mmdb');
   const asnLookup = await maxmind.open('./GeoLite2-ASN.mmdb');
   serverList = config.customIps ? fs.readFileSync(config.ipsPath) : Buffer.from(await (await fetch('https://github.com/kgurchiek/Minecraft-Server-Scanner/raw/main/ips')).arrayBuffer());
@@ -83,7 +84,7 @@ async function main() {
         }
       }
 
-      if (config.auth && !(!config.saveToMongo && config.saveToFile && config.compressed)) {
+      if (scanAuth && !(!config.saveToMongo && config.saveToFile && config.compressed)) {
         const auth = await authCheck(server.ip, server.port, minecraftData(response.version.protocol) == null ? 763 : response.version.protocol, config.pingTimeout);
         if (typeof auth != 'string') newObj.cracked = auth;
       }
@@ -121,7 +122,7 @@ async function main() {
           }
         });
 
-        if (operations.length >= (config.ping ? 15000 : 5000)) {
+        if (operations.length >= (config.ping ? 45000 : 15000)) {
           console.log('Writing to db');
           scannedServers.bulkWrite(operations)
           .catch(err => {
@@ -199,6 +200,7 @@ async function main() {
           writeStream.end();
         }
         console.log(`Finished scanning ${resultCount} servers in ${(new Date() - startTime) / 1000} seconds at ${new Date().toLocaleString()}.`);
+        lastAuth = new Date().getTime();
         if (config.repeat) timeout(main, config.repeatDelay, 0);
       }
     }
@@ -208,4 +210,4 @@ async function main() {
   scanBatch(startNum);
 }
 
-main();
+main(config.auth)
