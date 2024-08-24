@@ -81,7 +81,6 @@ module.exports = {
       packetLength = Buffer.alloc(1);
       packetLength.writeUInt8(startLoginPacket.length);
       const response = await send(ip, port, Buffer.concat([buffer, packetLength, startLoginPacket]), 6000);
-      if (typeof response != 'string' && response[0] == 0) console.log(response.toString())
       if (typeof response == 'string') return `Error: ${response}`;
       else return response[0] == 0 ? 'unknown' : (response[0] != 1);
     } catch (error) { return `Error: ${error}`; }
