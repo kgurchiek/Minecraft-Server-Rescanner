@@ -3,12 +3,10 @@ const config = require('./config.json');
 const maxmind = require('maxmind');
 const minecraftData = require('minecraft-data');
 const { ping, authCheck } = require('./ping.js');
+let mongodb;
+if (config.saveToMongo) mongodb = require('mongodb');
 var scannedServers;
-var players;
-if (config.saveToMongo) {
-  const MongoClient = require('mongodb').MongoClient;
-  scannedServers = new MongoClient(config.mongoURI).db(config.dbName).collection(config.collectionName);
-}
+var playerHistory;
 var fs = config.saveToFile || config.customIps ? fs = require('fs') : null;
 var serverList;
 var totalServers;
@@ -20,6 +18,12 @@ function timeout(func, delay, ms) {
 }
 
 async function main(scanAuth = false) {
+  if (scannedServers == null && config.saveToMongo) {
+    const client = new mongodb.MongoClient(config.mongoURI);
+    await client.connect();
+    scannedServers = client.db(config.dbName).collection(config.collectionName);
+    playerHistory = client.db(config.dbName).collection(config.playerHistoryCollection);  
+  }
   const cityLookup = await maxmind.open('./GeoLite2-City.mmdb');
   const asnLookup = await maxmind.open('./GeoLite2-ASN.mmdb');
   serverList = config.customIps ? fs.readFileSync(config.ipsPath) : Buffer.from(await (await fetch('https://github.com/kgurchiek/Minecraft-Server-Scanner/raw/main/ips')).arrayBuffer());
@@ -29,7 +33,7 @@ async function main(scanAuth = false) {
   var resultCount = 0;
   var startTime = new Date();
   var operations = [];
-  var playerOperations = [];
+  var historyOperations = [];
   var writeStream = config.saveToFile ? fs.createWriteStream('./results') : null;
   if (config.saveToFile && !config.compressed) writeStream.write('[')
   
@@ -94,6 +98,16 @@ async function main(scanAuth = false) {
         if (config.ping) {
           newObj['players.max'] = response.players.max;
           newObj['players.online'] = response.players.online;
+
+          if (config.playerHistory) {
+            historyOperations.push({
+              updateOne: {
+                filter: { ip: server.ip, port: server.port },
+                update: { $set: newObj },
+                upsert: true
+              }
+            });
+          }
           
           if (Array.isArray(response.players.sample)) {
             for (const player of response.players.sample) {
@@ -129,6 +143,13 @@ async function main(scanAuth = false) {
             console.log(err);
           })
           operations = [];
+        }
+
+        if (historyOperations.length >= 15000) {
+          console.log('Writing player history to db');
+          playerHistory.bulkWrite(historyOperations)
+          .catch(err => console.log(err))
+          historyOperations = [];
         }
       }
       if (config.saveToFile) {
@@ -188,11 +209,11 @@ async function main(scanAuth = false) {
             operations = [];
           }
 
-          if (config.players && playerOperations.length > 0) {
-            console.log('Writing players to db');
-            players.bulkWrite(playerOperations)
+          if (config.playerHistory && historyOperations.length > 0) {
+            console.log('Writing player history to db');
+            playerHistory.bulkWrite(historyOperations)
             .catch(err => console.log(err))
-            playerOperations = [];
+            historyOperations = [];
           }
         }
         if (config.saveToFile) {
