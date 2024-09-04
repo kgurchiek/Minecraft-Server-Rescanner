@@ -103,7 +103,7 @@ async function main(scanAuth = false) {
             historyOperations.push({
               updateOne: {
                 filter: { ip: server.ip, port: server.port },
-                update: { $set: newObj },
+                update: { $set: { ip: server.ip, port: server.port }, $push: { history: { online: response.players.online, date: lastSeen }} },
                 upsert: true
               }
             });
