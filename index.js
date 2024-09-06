@@ -13,7 +13,7 @@ var totalServers;
 var lastAuth = 0;
 
 function timeout(func, delay, ms) {
-  if (ms >= delay) func(config.auth && new Date().getTime >= lastAuth + config.authRepeatDelay);
+  if (ms >= delay) func(config.auth && new Date().getTime() >= lastAuth + config.authRepeatDelay);
   else setTimeout(() => { timeout(func, delay, ms + 100) }, 100);
 }
 
