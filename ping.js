@@ -45,7 +45,7 @@ module.exports = {
   authCheck: async (ip, port, protocol, timeout) => {
     try {
       const mcData = minecraftData(protocol);
-      const username = `Cornbread2100${Math.floor(Math.random() * 100)}`;
+      const username = 'Cornbread2100_`;
       var hasResponded = false;
 
       const handshakePacket = Buffer.concat([
