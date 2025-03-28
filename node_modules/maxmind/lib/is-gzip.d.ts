@@ -1,0 +1,2 @@
+declare const _default: (buf: Buffer) => boolean;
+export default _default;

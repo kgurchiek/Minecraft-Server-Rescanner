@@ -46,15 +46,14 @@ module.exports = {
     try {
       const mcData = minecraftData(protocol);
       const username = 'Cornbread2100_';
-      var hasResponded = false;
 
       const handshakePacket = Buffer.concat([
         Buffer.from([0x00]), // packet ID
-        Buffer.from(varint.encode(protocol)), //protocol version
+        Buffer.from(varint.encode(protocol)), // protocol version
         Buffer.from([ip.length]),
         Buffer.from(ip, 'utf-8'), // server address
         Buffer.from(new Uint16Array([port]).buffer).reverse(), // server port
-        Buffer.from([0x02]) // next state (2)
+        Buffer.from([0x02]) // next state
       ]);
       var packetLength = Buffer.alloc(1);
       packetLength.writeUInt8(handshakePacket.length);
@@ -68,7 +67,7 @@ module.exports = {
         } else {
           switch (packetFormat[i].name) {
             case 'username':
-              buffers.push(Buffer.from([username.length])); // length of username
+              buffers.push(Buffer.from([username.length]));
               buffers.push(Buffer.from(username, 'utf-8')); // username
               break;
             default:

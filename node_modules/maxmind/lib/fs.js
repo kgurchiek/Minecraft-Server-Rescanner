@@ -1,0 +1,15 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const fs_1 = __importDefault(require("fs"));
+const util_1 = __importDefault(require("util"));
+exports.default = {
+    existsSync: fs_1.default.existsSync,
+    readFile: util_1.default.promisify(fs_1.default.readFile),
+    watchFile: fs_1.default.watchFile,
+    createReadStream: fs_1.default.createReadStream,
+    stat: util_1.default.promisify(fs_1.default.stat),
+};
+//# sourceMappingURL=fs.js.map
