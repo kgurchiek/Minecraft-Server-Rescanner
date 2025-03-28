@@ -192,7 +192,7 @@ async function main(scanAuth = false) {
               if (player.name == null || player.id == null || typeof player.name != 'string' || typeof player.id != 'string') continue;
               playerQueue.push([player.name, player.id]);
               historyQueue.push([newIp, newPort, player.name, player.id, result.lastSeen]);
-              if (playerQueue.length >= 10000 || historyQueue.length >= 10000) writePlayers(playerQueue.splice(0), historyQueue.splice(0));
+              if ((playerQueue.length > 0 && playerQueue.length >= 32767 / playerQueue[0].length - 1) || (historyQueue.length > 0 && historyQueue.length >= 32767 / historyQueue[0].length - 1)) writePlayers(playerQueue.splice(0), historyQueue.splice(0));
             }
           }
         }
@@ -220,7 +220,7 @@ async function main(scanAuth = false) {
           result.whitelist,
           result.players?.sample != null
         ]);
-        if (serverQueue.length >= 1000) writeServers(serverQueue.splice(0));
+        if (serverQueue.length > 0 && serverQueue.length >= 32767 / serverQueue[0].length - 1) writeServers(serverQueue.splice(0));
       }
       if (config.saveToFile) {
         result.players = response.players;
