@@ -1,7 +1,5 @@
 {
   "ping": true,
-  "players": true,
-  "playerHistory": false,
   "auth": false,
   "postgres": false,
   "sql": {

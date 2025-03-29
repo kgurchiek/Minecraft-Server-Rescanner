@@ -11,13 +11,17 @@ The script will write all ping results to the collection specified in the config
 ## Configs
 - **ping:** Whether or not to status ping the server
 - **auth:** Whether or not to check for the authentication mode (online or cracked) of the server
-- **saveToMongo:** Whether or not to write results to a mongodb
-- **mongoURI:** The URI used to connect to your Mongo database \(only used if `saveToMongo` is set to `true`\)
-- **collectionName:** The name of the collection you want to save the results in \(only used if `saveToMongo` is set to `true`\)
+- **postgres:** Whether or not to write results to a PostgreSQL database
+    - **host**
+    - **port**
+    - **user**
+    - **password**
+    - **database**
 - **saveToFile:** Whether or not to save results to a local file \(saved to the name `results`\)
 - **compressed:** If `false`, ping results are stored as a json. If `true`, only the ips and ports of confirmed Minecraft servers are stored in the compressed format used by [Minecraft-Server-Scanner](https://github.com/kgurchiek/Minecraft-Server-Scanner) \(4 bytes for the ip, 2 for the port\).
 - **repeat:** Whether or not to automatically scan again after the scan is finished
 - **repeatDelay:** How long to wait between automated rescans
+- **authRepeatDelay:** How long to wait between auth scans
 - **maxPings:** The maximum number of pings sent at once
 - **pingTimeout:** How long to wait for a response before deciding a server is offline
 - **pingDelay:** How long to wait between ping "chunks"
