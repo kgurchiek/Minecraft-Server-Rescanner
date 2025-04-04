@@ -46,7 +46,18 @@ async function main(scanAuth = false) {
   const startTime = new Date();
   const cityLookup = await maxmind.open('./GeoLite2-City.mmdb');
   const asnLookup = await maxmind.open('./GeoLite2-ASN.mmdb');
-  serverList = config.customIps ? fs.readFileSync(config.ipsPath) : Buffer.from(await (await fetch('https://github.com/kgurchiek/Minecraft-Server-Scanner/raw/main/ips')).arrayBuffer());
+  if (customIps) serverList = fs.readFileSync(config.ipsPath);
+  else {
+    serverList = null;
+    while (serverList == null) {
+      try {
+        serverList = Buffer.from(await (await fetch('https://github.com/kgurchiek/Minecraft-Server-Scanner/raw/main/ips')).arrayBuffer());
+      } catch (err) {
+        console.error('Error fetching server list:', err);
+        await new Promise(res => setTimeout(res, 1000));
+      }
+    }
+  }
   totalServers = serverList.length / 6;
   console.log(`Total servers: ${totalServers}`);
   let serversPinged = 0;
