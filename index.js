@@ -46,7 +46,7 @@ async function main(scanAuth = false) {
   const startTime = new Date();
   const cityLookup = await maxmind.open('./GeoLite2-City.mmdb');
   const asnLookup = await maxmind.open('./GeoLite2-ASN.mmdb');
-  if (customIps) serverList = fs.readFileSync(config.ipsPath);
+  if (config.customIps) serverList = fs.readFileSync(config.ipsPath);
   else {
     serverList = null;
     while (serverList == null) {
