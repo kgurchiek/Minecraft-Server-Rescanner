@@ -1,5 +1,6 @@
 // Fetches dependencies and inits variables
 const config = require('./config.json');
+const fs = require('fs');
 const maxmind = require('maxmind');
 const minecraftData = require('minecraft-data');
 const { ping, authCheck } = require('./ping.js');
@@ -18,13 +19,20 @@ if (config.postgres) {
     }
   });
 }
-const fs = (config.saveToFile || config.customIps) ? require('fs') : null;
 let serverList;
 let totalServers;
 let lastAuth = 0;
+try {
+  let data = fs.readFileSync('./lastAuth');
+  if (data?.length == 8) lastAuth = Number(data.readBigUint64BE());
+  else {
+    console.error('Deleting corrupted lastAuth file');
+    fs.unlinkSync('./lastAuth');
+  }
+} catch (err) {}
 
-function timeout(func, delay, ms) {
-  if (ms >= delay) func(config.auth && new Date().getTime() >= lastAuth + config.authRepeatDelay);
+function timeout(func, delay, ms = 0) {
+  if (ms >= delay) func(config.auth && Date.now() / 1000 >= lastAuth + config.authRepeatDelay);
   else setTimeout(() => { timeout(func, delay, ms + 100) }, 100);
 }
 
@@ -43,6 +51,13 @@ function cleanDescription(description) {
 }
 
 async function main(scanAuth = false) {
+  if (scanAuth) {
+    console.log('Auth scan');
+    lastAuth = Math.round(Date.now() / 1000);
+    let buf = Buffer.alloc(8);
+    buf.writeBigUInt64BE(BigInt(lastAuth));
+    fs.writeFileSync('./lastAuth', buf);
+  }
   const startTime = new Date();
   const cityLookup = await maxmind.open('./GeoLite2-City.mmdb');
   const asnLookup = await maxmind.open('./GeoLite2-ASN.mmdb');
@@ -189,7 +204,7 @@ async function main(scanAuth = false) {
       }
 
       if (scanAuth && (config.postgres || (config.saveToFile && !config.compressed))) {
-        const auth = await authCheck(server.ip, server.port, minecraftData(response.version.protocol) == null ? 763 : response.version.protocol, config.pingTimeout);
+        const auth = await authCheck(server.ip, server.port, (response.version?.protocol == null || minecraftData(response.version.protocol) == null) ? 763 : response.version.protocol, config.pingTimeout);
         if (typeof auth != 'string') result.cracked = auth;
       }
 
@@ -290,7 +305,6 @@ async function main(scanAuth = false) {
           writeStream.end();
         }
         console.log(`Finished scanning ${resultCount} servers in ${(new Date() - startTime) / 1000} seconds at ${new Date().toLocaleString()}.`);
-        lastAuth = new Date().getTime();
         if (config.repeat) timeout(main, config.repeatDelay, 0);
       }
     }
@@ -305,5 +319,5 @@ async function main(scanAuth = false) {
     await client.connect();
     console.log('Connected to database');
   }
-  main(config.auth);
+  timeout(main, 0);
 })();
