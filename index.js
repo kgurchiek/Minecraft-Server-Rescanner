@@ -84,10 +84,10 @@ async function main(scanAuth = false) {
   function writeServers(servers) {
     // console.log('Writing servers to db');
     let placeholder = 1;
-    let rows = new Array(servers.length).fill(null).map(a => `(${new Array(servers[0].length).fill(null).map(a => `$${placeholder++}`).join(', ')})`).join(',');
+    let rows = new Array(servers.length).fill(null).map(a => `(${new Array(servers[0].length).fill(null).map(a => `$${placeholder++}`).concat([`to_tsvector($${placeholder - 15})`]).join(', ')})`).join(',');
     let params = servers.reduce((a, b) => a.concat(b), []);
     servers = [];
-    client.query(`INSERT INTO servers (ip, port, discovered, lastSeen, version, protocol, description, rawDescription, playerCount, playerLimit, hasFavicon, hasForgeData, enforcesSecureChat, org, country, city, lat, lon, cracked, whitelisted, hasPlayerSample)
+    client.query(`INSERT INTO servers (ip, port, discovered, lastSeen, version, protocol, description, rawDescription, playerCount, playerLimit, hasFavicon, hasForgeData, enforcesSecureChat, org, country, city, lat, lon, cracked, whitelisted, hasPlayerSample, descriptionVector)
       VALUES ${rows}
       ON CONFLICT (ip, port) DO UPDATE SET
       lastSeen = excluded.lastSeen,
@@ -107,7 +107,8 @@ async function main(scanAuth = false) {
       lon = excluded.lon,
       cracked = excluded.cracked,
       whitelisted = excluded.whitelisted,
-      hasPlayerSample = excluded.hasPlayerSample;`,
+      hasPlayerSample = excluded.hasPlayerSample,
+      descriptionVector = excluded.descriptionVector;`,
       params
     )
     .catch(err => console.error('Error writing servers to db:', err))
