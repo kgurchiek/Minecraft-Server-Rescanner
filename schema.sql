@@ -30,9 +30,9 @@ ALTER SCHEMA pgtle OWNER TO postgres;
 --
 
 CREATE TYPE public.server AS (
-	ip integer,
-	port smallint,
-	lastseen bigint
+        ip integer,
+        port smallint,
+        lastseen bigint
 );
 
 
@@ -41,6 +41,58 @@ ALTER TYPE public.server OWNER TO postgres;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: bedrock; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.bedrock (
+    serverid bigint NOT NULL,
+    ip integer,
+    port smallint,
+    discovered bigint,
+    lastseen bigint,
+    education boolean,
+    version text,
+    protocol integer,
+    description text,
+    rawdescription text,
+    description2 text,
+    rawdescription2 text,
+    playercount integer,
+    playerlimit integer,
+    gamemode text,
+    modeid integer,
+    org text,
+    country text,
+    city text,
+    lat real,
+    lon real
+);
+
+
+ALTER TABLE public.bedrock OWNER TO postgres;
+
+--
+-- Name: bedrock_serverid_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.bedrock_serverid_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.bedrock_serverid_seq OWNER TO postgres;
+
+--
+-- Name: bedrock_serverid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.bedrock_serverid_seq OWNED BY public.bedrock.serverid;
+
 
 --
 -- Name: history; Type: TABLE; Schema: public; Owner: postgres
@@ -146,6 +198,13 @@ ALTER SEQUENCE public.servers_serverid_seq OWNED BY public.servers.serverid;
 
 
 --
+-- Name: bedrock serverid; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.bedrock ALTER COLUMN serverid SET DEFAULT nextval('public.bedrock_serverid_seq'::regclass);
+
+
+--
 -- Name: players playerid; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -157,6 +216,22 @@ ALTER TABLE ONLY public.players ALTER COLUMN playerid SET DEFAULT nextval('publi
 --
 
 ALTER TABLE ONLY public.servers ALTER COLUMN serverid SET DEFAULT nextval('public.servers_serverid_seq'::regclass);
+
+
+--
+-- Name: bedrock bedrock_ip_port_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.bedrock
+    ADD CONSTRAINT bedrock_ip_port_key UNIQUE (ip, port);
+
+
+--
+-- Name: bedrock bedrock_pkey1; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.bedrock
+    ADD CONSTRAINT bedrock_pkey1 PRIMARY KEY (serverid);
 
 
 --
@@ -197,6 +272,76 @@ ALTER TABLE ONLY public.servers
 
 ALTER TABLE ONLY public.servers
     ADD CONSTRAINT servers_pkey1 PRIMARY KEY (serverid);
+
+
+--
+-- Name: bedrock_discovered; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX bedrock_discovered ON public.bedrock USING btree (discovered);
+
+
+--
+-- Name: bedrock_ip; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX bedrock_ip ON public.bedrock USING btree (ip);
+
+
+--
+-- Name: bedrock_lastseen; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX bedrock_lastseen ON public.bedrock USING btree (lastseen);
+
+
+--
+-- Name: bedrock_lat; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX bedrock_lat ON public.bedrock USING btree (lat);
+
+
+--
+-- Name: bedrock_lon; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX bedrock_lon ON public.bedrock USING btree (lon);
+
+
+--
+-- Name: bedrock_modeid; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX bedrock_modeid ON public.bedrock USING btree (modeid);
+
+
+--
+-- Name: bedrock_playercount; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX bedrock_playercount ON public.bedrock USING btree (playercount);
+
+
+--
+-- Name: bedrock_playerlimit; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX bedrock_playerlimit ON public.bedrock USING btree (playerlimit);
+
+
+--
+-- Name: bedrock_port; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX bedrock_port ON public.bedrock USING btree (port);
+
+
+--
+-- Name: bedrock_protocol; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX bedrock_protocol ON public.bedrock USING btree (protocol);
 
 
 --
@@ -351,4 +496,3 @@ ALTER TABLE ONLY public.history
 --
 -- PostgreSQL database dump complete
 --
-

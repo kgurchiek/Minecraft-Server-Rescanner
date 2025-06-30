@@ -1,22 +1,24 @@
 {
+  "java": true,
+  "bedrock": false,
   "ping": true,
   "auth": false,
   "postgres": false,
-  "sql": {
+   "sql": {
       "host": "",
       "port": 5432,
       "user": "",
       "password": "",
       "database": ""
   },
-  "saveToFile": false,
+  "saveToFile": true,
   "compressed": false,
   "repeat": false,
   "repeatDelay": 300000,
   "authRepeatDelay": 86400000,
-  "maxPings": 2000,
+  "scanRate": 3000,
   "pingTimeout": 3000,
-  "pingDelay": 3000,
   "customIps": false,
-  "ipsPath": "./ips"
+  "javaIps": "./ips",
+  "bedrockIps": "./ips_b"
 }

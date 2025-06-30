@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "dgram": "^1.0.1",
     "maxmind": "^4.3.24",
     "minecraft-data": "^3.85.0",
     "pg": "^8.14.1",

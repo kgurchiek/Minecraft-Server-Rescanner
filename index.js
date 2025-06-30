@@ -3,7 +3,7 @@ const config = require('./config.json');
 const fs = require('fs');
 const maxmind = require('maxmind');
 const minecraftData = require('minecraft-data');
-const { ping, authCheck } = require('./ping.js');
+const { ping, bedrockPing, authCheck } = require('./ping.js');
 let client;
 if (config.postgres) {
   const pg = require('pg');
@@ -20,7 +20,9 @@ if (config.postgres) {
   });
 }
 let serverList;
+let bedrockServers;
 let totalServers;
+let totalBedrock;
 let lastAuth = 0;
 try {
   let data = fs.readFileSync('./lastAuth');
@@ -32,13 +34,13 @@ try {
 } catch (err) {}
 
 function timeout(func, delay, ms = 0) {
-  if (ms >= delay) func(config.auth && Date.now() / 1000 >= lastAuth + config.authRepeatDelay);
+  if (ms >= delay) func();
   else setTimeout(() => { timeout(func, delay, ms + 100) }, 100);
 }
 
 function cleanDescription(description) {
   if (description == null) return null;
-  if (typeof description == 'string') return description;
+  if (typeof description == 'string') return cleanDescription({ text: description });
   if (typeof description != 'object') return String(description);
   if (Array.isArray(description)) return description.reduce((a, b) => a + cleanDescription(b), '');
   let newDescription = String(description.text == null ? '' : description.text) + String(description.translate == null ? '' : description.translate) + (description.extra || []).reduce((a, b) => a + cleanDescription(b), '');
@@ -50,7 +52,8 @@ function cleanDescription(description) {
   return description;
 }
 
-async function main(scanAuth = false) {
+async function main(game) {
+  let scanAuth = config.auth && Date.now() / 1000 >= lastAuth + config.authRepeatDelay;
   if (scanAuth) {
     console.log('Auth scan');
     lastAuth = Math.round(Date.now() / 1000);
@@ -58,11 +61,12 @@ async function main(scanAuth = false) {
     buf.writeBigUInt64BE(BigInt(lastAuth));
     fs.writeFileSync('./lastAuth', buf);
   }
-  const startTime = new Date();
   const cityLookup = await maxmind.open('./GeoLite2-City.mmdb');
   const asnLookup = await maxmind.open('./GeoLite2-ASN.mmdb');
-  if (config.customIps) serverList = fs.readFileSync(config.ipsPath);
-  else {
+  if (config.customIps) {
+    if (config.java) serverList = fs.readFileSync(config.javaIps);
+    if (config.bedrock) bedrockServers = fs.readFileSync(config.bedrockIps);
+  } else {
     serverList = null;
     while (serverList == null) {
       try {
@@ -73,13 +77,15 @@ async function main(scanAuth = false) {
       }
     }
   }
-  totalServers = serverList.length / 6;
-  console.log(`Total servers: ${totalServers}`);
+  if (config.java) serverList = Math.floor(serverList.length / 6);
+  if (config.bedrock) totalBedrock = Math.floor(bedrockServers.length / 6);
+  console.log(`Total servers: ${game == 'java' ? totalServers : totalBedrock}`);
   let serversPinged = 0;
   let resultCount = 0;
   let serverQueue = [];
   let playerQueue = [];
   let historyQueue = [];
+  let bedrockQueue = [];
 
   function writeServers(servers) {
     // console.log('Writing servers to db');
@@ -149,42 +155,75 @@ async function main(scanAuth = false) {
     .catch(err => console.error('Error writing history to db:', err))
   }
   
-  let writeStream = config.saveToFile ? fs.createWriteStream('./results') : null;
-  if (config.saveToFile && !config.compressed) writeStream.write('[')
+  function writeBedrock(servers) {
+    // console.log('Writing servers to db');
+    let placeholder = 1;
+    let rows = new Array(servers.length).fill(null).map(a => `(${new Array(servers[0].length).fill(null).map(a => `$${placeholder++}`).join(', ')})`).join(',');
+    let params = servers.reduce((a, b) => a.concat(b), []);
+    servers = [];
+    client.query(`INSERT INTO bedrock (ip, port, discovered, lastSeen, education, version, protocol, description, rawDescription, description2, rawDescription2, playerCount, playerLimit, gameMode, modeId, org, country, city, lat, lon)
+      VALUES ${rows}
+      ON CONFLICT (ip, port) DO UPDATE SET
+      lastSeen = excluded.lastSeen,
+      education = excluded.education,
+      version = excluded.version,
+      protocol = excluded.protocol,
+      description = excluded.description,
+      rawDescription = excluded.rawDescription,
+      description2 = excluded.description2,
+      rawDescription2 = excluded.rawDescription2,
+      playerCount = excluded.playerCount,
+      playerLimit = excluded.playerLimit,
+      gameMode = excluded.gameMode,
+      modeId = excluded.modeId,
+      org = excluded.org,
+      country = excluded.country,
+      city = excluded.city,
+      lat = excluded.lat,
+      lon = excluded.lon;`,
+      params
+    )
+    .catch(err => console.error('Error writing servers to db:', err))
+  }
   
-  // start randomly within the list to vary which servers come first, since packet loss gets worse futher into the scan
-  let startNum = Math.floor(Math.random() * Math.floor(totalServers / config.maxPings)) * config.maxPings;
-  if (startNum == 0) startNum = config.maxPings;
+  let writeStream = config.saveToFile ? fs.createWriteStream(`results${config.compressed ? '' : '.json'}`) : null;
+  let bedrockStream = config.saveToFile ? fs.createWriteStream(`results_b${config.compressed ? '' : '.json'}`) : null;
+  if (config.saveToFile && !config.compressed) {
+    if (config.java) writeStream.write('[');
+    if (config.bedrock) bedrockStream.write('[');
+  }
 
   function getServer(i) {
-    const ip = `${serverList[i * 6]}.${serverList[(i * 6) + 1]}.${serverList[(i * 6) + 2]}.${serverList[(i * 6) + 3]}`;
-    const port = serverList[(i * 6) + 4] * 256 + serverList[(i * 6) + 5];
+    let servers = game == 'java' ? serverList : bedrockServers;
+    const ip = `${servers[i * 6]}.${servers[(i * 6) + 1]}.${servers[(i * 6) + 2]}.${servers[(i * 6) + 3]}`;
+    const port = servers[(i * 6) + 4] * 256 + servers[(i * 6) + 5];
 
-    return { ip, port }
+    return { ip, port };
   }
 
   async function pingServer(server) {
     serversPinged++;
-    if (serversPinged % 20000 == 0) console.log(serversPinged);
     try {
       let result = {};
-      const response = await ping(server.ip, server.port, 0, config.pingTimeout);
-      const lastSeen = Math.floor((new Date()).getTime() / 1000);
+      let response = await (game == 'java' ? ping : bedrockPing)(server.ip, server.port, 0, config.pingTimeout);
+      let lastSeen = Math.floor(Date.now() / 1000);
       if (typeof response !== 'object') return;
       resultCount++;
       if (config.ping) {
         if (config.postgres || (config.saveToFile && !config.compressed)) {
-          result = {
-            ip: server.ip,
-            port: server.port,
-            version: response.version,
-            players: response.players,
-            description: response.description,
-            enforcesSecureChat: response.enforcesSecureChat,
-            hasFavicon: response.favicon != null,
-            hasForgeData: response.forgeData != null,
-            lastSeen: lastSeen
-          }
+          if (game == 'java') {
+            result = {
+              ip: server.ip,
+              port: server.port,
+              version: response.version,
+              players: response.players,
+              description: response.description,
+              enforcesSecureChat: response.enforcesSecureChat,
+              hasFavicon: response.favicon != null,
+              hasForgeData: response.forgeData != null,
+              lastSeen: lastSeen
+            }
+          } else result = response;
           let location = cityLookup.get(server.ip);
           if (location != null) {
             result['geo'] = {};
@@ -204,16 +243,16 @@ async function main(scanAuth = false) {
         }
       }
 
-      if (scanAuth && (config.postgres || (config.saveToFile && !config.compressed))) {
+      if (game == 'java' && scanAuth && (config.postgres || (config.saveToFile && !config.compressed))) {
         const auth = await authCheck(server.ip, server.port, (response.version?.protocol == null || minecraftData(response.version.protocol) == null) ? 763 : response.version.protocol, config.pingTimeout);
         if (typeof auth != 'string') result.cracked = auth;
       }
 
       if (config.postgres) {
-        let newIp = result.ip.split('.').reverse().map((a, i) => parseInt(a) * 256**i).reduce((a, b) => a + b, 0) - 2147483648;
-        let newPort = result.port - 32768;
+        let newIp = server.ip.split('.').reverse().map((a, i) => parseInt(a) * 256**i).reduce((a, b) => a + b, 0) - 2147483648;
+        let newPort = server.port - 32768;
 
-        if (config.ping) {
+        if (game == 'java' && config.ping) {
           if (response.players?.sample != null && Array.isArray(response.players.sample)) {
             for (const player of response.players.sample) {
               if (player.name == null || player.id == null || typeof player.name != 'string' || typeof player.id != 'string') continue;
@@ -223,96 +262,112 @@ async function main(scanAuth = false) {
             }
           }
         }
-
-        serverQueue.push([
-          newIp,
-          newPort,
-          result.lastSeen,
-          result.lastSeen,
-          result.version?.name,
-          result.version?.protocol,
-          cleanDescription(result.description),
-          JSON.stringify(result.description),
-          result.players?.online,
-          result.players?.max,
-          result.hasFavicon,
-          result.hasForgeData,
-          result.enforcesSecureChat,
-          result.org,
-          result.geo?.country,
-          result.geo?.city,
-          result.geo?.lat,
-          result.geo?.lon,
-          result.cracked,
-          result.whitelist,
-          result.players?.sample != null
-        ]);
+        
+        if (game == 'java') {
+          serverQueue.push([
+            newIp,
+            newPort,
+            lastSeen,
+            lastSeen,
+            result.version?.name,
+            result.version?.protocol,
+            cleanDescription(result.description),
+            JSON.stringify(result.description),
+            result.players?.online,
+            result.players?.max,
+            result.hasFavicon,
+            result.hasForgeData,
+            result.enforcesSecureChat,
+            result.org,
+            result.geo?.country,
+            result.geo?.city,
+            result.geo?.lat,
+            result.geo?.lon,
+            result.cracked,
+            result.whitelist,
+            result.players?.sample != null
+          ]);
+        } else {
+          bedrockQueue.push([
+            newIp,
+            newPort,
+            lastSeen,
+            lastSeen,
+            result.edition == 'MCEE',
+            result.version.name,
+            parseInt(result.version.protocol),
+            cleanDescription(result.description),
+            result.description,
+            cleanDescription(result.description2),
+            result.description2,
+            parseInt(result.players.online),
+            parseInt(result.players.max),
+            result.gamemode.name,
+            parseInt(result.gamemode.id),
+            result.org,
+            result.geo?.country,
+            result.geo?.city,
+            Number(result.geo?.lat),
+            Number(result.geo?.lon)
+          ].map(a => (typeof a == 'number' && isNaN(a)) ? null : a));
+        }
         if (serverQueue.length > 0 && serverQueue.length >= 32767 / serverQueue[0].length - 1) writeServers(serverQueue.splice(0));
+        if (bedrockQueue.length > 0 && bedrockQueue.length >= 32767 / bedrockQueue[0].length - 1) writeBedrock(bedrockQueue.splice(0));
       }
       if (config.saveToFile) {
+        let stream = game == 'java' ? writeStream : bedrockStream;
         result.players = response.players;
         if (config.compressed) {
-          const splitIP = result.ip.split('.');
-          writeStream.write(Buffer.from([
+          const splitIP = server.ip.split('.');
+          stream.write(Buffer.from([
             parseInt(splitIP[0]),
             parseInt(splitIP[1]),
             parseInt(splitIP[2]),
             parseInt(splitIP[3]),
-            Math.floor(result.port / 256),
-            result.port % 256
+            Math.floor(server.port / 256),
+            server.port % 256
           ]));
         } else {
-          writeStream.write('\n' + JSON.stringify(result));
+          stream.write(`${resultCount > 1 ? ',' : ''}\n${JSON.stringify(result)}`);
         }
       }
     } catch (error) {
-      console.log(error)
-    }
-  }
-
-  function scanBatch(i) {
-    if (i >= startNum) {
-      if (i + config.maxPings < totalServers) {
-        // scan through the end of the server list
-        for (let j = i; j < i + config.maxPings; j++) {
-          pingServer(getServer(j))
-        }
-        setTimeout(function() { scanBatch(i + config.maxPings) }, config.pingDelay);
-      } else {
-        // once the end of the list is reached, restart at the beginning
-        for (let j = i; j < totalServers; j++) {
-          pingServer(getServer(j))
-        }
-        setTimeout(function() { scanBatch(0) }, config.pingDelay);
-      }
-    } else {
-      // scan up to the server that was started with (after restarting at the beginning)
-      if (i + config.maxPings < startNum) {
-        for (let j = i; j < i + config.maxPings; j++) {
-          pingServer(getServer(j))
-        }
-        setTimeout(function() { scanBatch(i + config.maxPings) }, config.pingDelay);
-      } else {
-        for (let j = i; j < startNum - i; j++) {
-          pingServer(getServer(j))
-        }
-
-        // finish scan
-        if (serverQueue.length > 0) writeServers(serverQueue.splice(0));
-        if (playerQueue.length > 0 || historyQueue.length > 0) writePlayers(playerQueue.splice(0), historyQueue.splice(0));
-
-        if (config.saveToFile) {
-          if (!config.compressed) writeStream.write(']');
-          writeStream.end();
-        }
-        console.log(`Finished scanning ${resultCount} servers in ${(new Date() - startTime) / 1000} seconds at ${new Date().toLocaleString()}.`);
-        if (config.repeat) timeout(main, config.repeatDelay, 0);
-      }
+      console.log(error);
     }
   }
 
   console.log('Starting search...');
-  scanBatch(startNum);
+  let startTime = Date.now();
+  let total = game == 'java' ? totalServers : totalBedrock;
+  const progressLog = setInterval(() => {
+    const averageRate = Math.floor((Date.now() - startTime) / 1000) / serversPinged;
+    let estimatedTime = Math.floor(total - serversPinged) * averageRate;
+    const hours = Math.floor(estimatedTime / 3600);
+    estimatedTime %= 3600;
+    const minutes = Math.floor(estimatedTime / 60);
+    estimatedTime %= 60
+    const seconds = Math.floor(estimatedTime);
+    console.log(`${serversPinged}/${total} (${Math.floor(serversPinged / total * 100)}%)  Results: ${resultCount}  Estimated ${hours > 0 ? `${hours}:${minutes < 10 ? 0 : ''}${minutes}` : minutes}:${seconds < 10 ? 0 : ''}${seconds} remaining.`)
+  }, 3000);
+  serversPinged = 0;
+  var startNum = Math.floor(Math.random() * total) * 6;
+  if (config.java) serverList = Buffer.concat([serverList.slice(startNum), serverList.slice(0, startNum)]);
+  if (config.bedrock) bedrockServers = Buffer.concat([bedrockServers.slice(startNum), bedrockServers.slice(0, startNum)]);
+  for (let j = 0; j < total; j++) {
+    pingServer(getServer(j));
+    await new Promise(res => setTimeout(res, (1 / config.scanRate) * 1000));
+  }
+  await new Promise(res => setTimeout(res, config.pingTimeout));
+  clearInterval(progressLog);
+  console.log(`Finished scanning ${resultCount} servers in ${(Date.now() - startTime) / 1000} seconds at ${new Date().toLocaleString()}.`);
+  if (config.saveToFile) {
+    let stream = game == 'java' ? writeStream : bedrockStream;
+    if (!config.compressed) stream.write('\n]');
+    stream.close();
+    console.log(`Saved results to ${stream.path}`);
+  }
+  if (config.repeat) timeout(main, config.repeatDelay);
+  else process.exit();
 }
 
 (async () => {
@@ -320,5 +375,6 @@ async function main(scanAuth = false) {
     await client.connect();
     console.log('Connected to database');
   }
-  timeout(main, 0);
+  if (config.java) main('java');
+  if (config.bedrock) main('bedrock');
 })();

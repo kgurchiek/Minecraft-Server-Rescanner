@@ -2,15 +2,15 @@
 Used to gather updated info from https://github.com/kgurchiek/Minecraft-Server-Scanner
 
 ## Usage
-First, set up a Mongo database. You can have one hosted for free at https://www.mongodb.com/cloud/atlas. Then put its URI into config.json.
-
-Install the required npm packages with the following command: `npm install minecraft-status, mongodb`.
-
-The script will write all ping results to the collection specified in the config file.
+- Set up a Postgres database and fill in the "`postgres`" settings in `config.json`.
+- Install the required npm packages with the following command: `npm install`.
+- If you wish to use your own list of ips
 
 ## Configs
-- **ping:** Whether or not to status ping the server
-- **auth:** Whether or not to check for the authentication mode (online or cracked) of the server
+- **java:** Whether or not to scan Java Edition servers
+- **bedrock:** Whether or not to scan Bedrock Edition servers
+- **ping:** Whether or not to save status ping results from the server
+- **auth:** Whether or not to check for the authentication mode (online or cracked) of the server (java only)
 - **postgres:** Whether or not to write results to a PostgreSQL database
     - **host**
     - **port**
@@ -22,14 +22,14 @@ The script will write all ping results to the collection specified in the config
 - **repeat:** Whether or not to automatically scan again after the scan is finished
 - **repeatDelay:** How long to wait between automated rescans
 - **authRepeatDelay:** How long to wait between auth scans
-- **maxPings:** The maximum number of pings sent at once
+- **scanRate:** How many pings are sent per second
 - **pingTimeout:** How long to wait for a response before deciding a server is offline
-- **pingDelay:** How long to wait between ping "chunks"
 - **customIps:** Whether or not you want to use your own list of ips rather than fetching from my scan
-- **ipsPath:** The relative file path to the list of ips to rescan \(only used if `customIps` is set to `true`\)
+- **javaIps:** The relative file path to the list of ips to scan for Java Edition servers \(only used if `java` and `customIps` are set to `true`\)
+- **bedrockIps:** The relative file path to the list of ips to scan for Bedrock Edition servers \(only used if `bedrock` and `customIps` are set to `true`\)
 
 ## How It Works
-The code from https://github.com/kgurchiek/Minecraft-Server-Scanner is being constantly run, updating the ips file. This code gets the file from github and rescans those ips to get updated information.
+The code from https://github.com/kgurchiek/Minecraft-Server-Scanner is being constantly run, updating the `ips` and `ibs_b` files. This script gets the file from github and scans those ips again to get updated information.
 
 # Information
 This product includes GeoLite2 data created by MaxMind, available from https://www.maxmind.com.

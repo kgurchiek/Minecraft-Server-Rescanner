@@ -1,3 +1,4 @@
+const dgram = require('dgram');
 const varint = require('varint');
 const minecraftData = require('minecraft-data');
 const send = require('./send.js')
@@ -40,6 +41,74 @@ module.exports = {
       } catch (error) {
         resolve('error');
       }
+    })
+  },
+  bedrockPing: (ip, port, protocol, timeout) => {
+    return new Promise((resolve, reject) => {
+      const timeoutCheck = setTimeout(() => {
+        client.close();
+        resolve('timeout');
+      }, timeout);
+      const magic = Buffer.from('00ffff00fefefefefdfdfdfd12345678', 'hex');
+      const timeBuffer = Buffer.allocUnsafe(8);
+      timeBuffer.writeBigInt64BE(BigInt(Date.now()), 0);
+      const clientGUID = Buffer.allocUnsafe(8);
+      for (let i = 0; i < 8; i++) clientGUID.writeUInt8(Math.floor(Math.random() * 256), i);
+      const packet = Buffer.concat([Buffer.from([0x01]), timeBuffer, magic, clientGUID]);
+      const client = dgram.createSocket('udp4');
+      client.on('error', (err) => {
+        console.log(`Error: ${err}`);
+        client.close();
+        clearTimeout(timeoutCheck);
+        resolve('error');
+      });
+      client.send(packet, port, ip, (err) => {
+        if (err) {
+          console.log('Error sending packet:', err);
+          client.close();
+          clearTimeout(timeoutCheck);
+          resolve('error');
+        }
+      });
+      client.on('message', (message, remote) => {
+        client.close();
+        clearTimeout(timeoutCheck);
+        try {
+          if (message[0] != 0x1c || message.length < 35) return resolve('invalid');
+          message = message.slice(33);
+          let len = message.slice(0, 2).readUint16BE();
+          if (message.length < len + 2) {
+            console.log(message.slice(2).toString());
+            resolve('invalid');
+          }
+          message = message.slice(2, len + 2).toString();
+          let [edition, description, protocol, version, playerCount, maxPlayers, id, description2, gamemode, modeId, ipv4Port, ipv6Port] = message.split(';').map(a => a || null);
+          resolve({
+            edition,
+            version: {
+              name: version,
+              protocol
+            },
+            description,
+            description2,
+            players: {
+              online: playerCount,
+              max: maxPlayers
+            },
+            gamemode: {
+              name: gamemode,
+              id: modeId
+            },
+            port: {
+              ipv4: ipv4Port,
+              ipv6: ipv6Port
+            }
+          });
+        } catch (err) {
+          console.log(err)
+          resolve('error');
+        }
+      });
     })
   },
   authCheck: async (ip, port, protocol, timeout) => {
@@ -85,3 +154,4 @@ module.exports = {
     } catch (error) { return `Error: ${error}`; }
   }
 }
+
