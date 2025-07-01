@@ -5,7 +5,7 @@ const maxmind = require('maxmind');
 const minecraftData = require('minecraft-data');
 const { ping, bedrockPing, authCheck } = require('./ping.js');
 let client;
-if (config.postgres) {
+if (config.java.postgres || config.bedrock.postgres) {
   const pg = require('pg');
   client = new pg.Client({
     host: config.sql.host,
@@ -19,10 +19,6 @@ if (config.postgres) {
     }
   });
 }
-let serverList;
-let bedrockServers;
-let totalServers;
-let totalBedrock;
 let lastAuth = 0;
 try {
   let data = fs.readFileSync('./lastAuth');
@@ -53,7 +49,9 @@ function cleanDescription(description) {
 }
 
 async function main(game) {
-  let scanAuth = config.auth && Date.now() / 1000 >= lastAuth + config.authRepeatDelay;
+  const cityLookup = await maxmind.open('./GeoLite2-City.mmdb');
+  const asnLookup = await maxmind.open('./GeoLite2-ASN.mmdb');
+  let scanAuth = config.java.auth && Date.now() / 1000 >= lastAuth + config.java.authScanDelay;
   if (scanAuth) {
     console.log('Auth scan');
     lastAuth = Math.round(Date.now() / 1000);
@@ -61,25 +59,37 @@ async function main(game) {
     buf.writeBigUInt64BE(BigInt(lastAuth));
     fs.writeFileSync('./lastAuth', buf);
   }
-  const cityLookup = await maxmind.open('./GeoLite2-City.mmdb');
-  const asnLookup = await maxmind.open('./GeoLite2-ASN.mmdb');
-  if (config.customIps) {
-    if (config.java) serverList = fs.readFileSync(config.javaIps);
-    if (config.bedrock) bedrockServers = fs.readFileSync(config.bedrockIps);
+  let serverList;
+  if (game == 'java') {
+    if (config.java.customIps) serverList = fs.readFileSync(config.java.ipsPath);
+    else {
+      while (serverList == null) {
+        try {
+          serverList = Buffer.from(await (await fetch('https://github.com/kgurchiek/Minecraft-Server-Scanner/raw/main/ips')).arrayBuffer());
+        } catch (err) {
+          console.error('Error fetching server list:', err);
+          await new Promise(res => setTimeout(res, 1000));
+        }
+      }
+    }
   } else {
-    serverList = null;
-    while (serverList == null) {
-      try {
-        serverList = Buffer.from(await (await fetch('https://github.com/kgurchiek/Minecraft-Server-Scanner/raw/main/ips')).arrayBuffer());
-      } catch (err) {
-        console.error('Error fetching server list:', err);
-        await new Promise(res => setTimeout(res, 1000));
+    if (config.bedrock.customIps) serverList = fs.readFileSync(config.bedrock.ipsPath);
+    else {
+      let tries = 0;
+      while (serverList == null) {
+        tries++;
+        try {
+          serverList = Buffer.from(await (await fetch('https://github.com/kgurchiek/Minecraft-Server-Scanner/raw/main/ips_b')).arrayBuffer());
+        } catch (err) {
+          console.error('Error fetching server list:', err);
+          if (tries == 3) process.exit();
+          await new Promise(res => setTimeout(res, 1000));
+        }
       }
     }
   }
-  if (config.java) serverList = Math.floor(serverList.length / 6);
-  if (config.bedrock) totalBedrock = Math.floor(bedrockServers.length / 6);
-  console.log(`Total servers: ${game == 'java' ? totalServers : totalBedrock}`);
+  let totalServers = Math.floor(serverList.length / 6);
+  console.log(`Total servers: ${totalServers}`);
   let serversPinged = 0;
   let resultCount = 0;
   let serverQueue = [];
@@ -186,17 +196,12 @@ async function main(game) {
     .catch(err => console.error('Error writing servers to db:', err))
   }
   
-  let writeStream = config.saveToFile ? fs.createWriteStream(`results${config.compressed ? '' : '.json'}`) : null;
-  let bedrockStream = config.saveToFile ? fs.createWriteStream(`results_b${config.compressed ? '' : '.json'}`) : null;
-  if (config.saveToFile && !config.compressed) {
-    if (config.java) writeStream.write('[');
-    if (config.bedrock) bedrockStream.write('[');
-  }
+  let writeStream = config[game].saveToFile ? fs.createWriteStream(`results${game == 'java' ? '' : '_b'}${config[game].compressed ? '' : '.json'}`) : null;
+  if (config[game].saveToFile && !config[game].compressed) writeStream.write('[');
 
   function getServer(i) {
-    let servers = game == 'java' ? serverList : bedrockServers;
-    const ip = `${servers[i * 6]}.${servers[(i * 6) + 1]}.${servers[(i * 6) + 2]}.${servers[(i * 6) + 3]}`;
-    const port = servers[(i * 6) + 4] * 256 + servers[(i * 6) + 5];
+    const ip = `${serverList[i * 6]}.${serverList[(i * 6) + 1]}.${serverList[(i * 6) + 2]}.${serverList[(i * 6) + 3]}`;
+    const port = serverList[(i * 6) + 4] * 256 + serverList[(i * 6) + 5];
 
     return { ip, port };
   }
@@ -205,12 +210,12 @@ async function main(game) {
     serversPinged++;
     try {
       let result = {};
-      let response = await (game == 'java' ? ping : bedrockPing)(server.ip, server.port, 0, config.pingTimeout);
+      let response = await (game == 'java' ? ping : bedrockPing)(server.ip, server.port, 0, config[game].timeout);
       let lastSeen = Math.floor(Date.now() / 1000);
       if (typeof response !== 'object') return;
       resultCount++;
-      if (config.ping) {
-        if (config.postgres || (config.saveToFile && !config.compressed)) {
+      if (config[game].ping) {
+        if (config[game].postgres || (config[game].saveToFile && !config[game].compressed)) {
           if (game == 'java') {
             result = {
               ip: server.ip,
@@ -243,16 +248,16 @@ async function main(game) {
         }
       }
 
-      if (game == 'java' && scanAuth && (config.postgres || (config.saveToFile && !config.compressed))) {
-        const auth = await authCheck(server.ip, server.port, (response.version?.protocol == null || minecraftData(response.version.protocol) == null) ? 763 : response.version.protocol, config.pingTimeout);
+      if (game == 'java' && scanAuth && (config[game].postgres || (config[game].saveToFile && !config[game].compressed))) {
+        const auth = await authCheck(server.ip, server.port, (response.version?.protocol == null || minecraftData(response.version.protocol) == null) ? 763 : response.version.protocol, config[game].timeout);
         if (typeof auth != 'string') result.cracked = auth;
       }
 
-      if (config.postgres) {
+      if (config[game].postgres) {
         let newIp = server.ip.split('.').reverse().map((a, i) => parseInt(a) * 256**i).reduce((a, b) => a + b, 0) - 2147483648;
         let newPort = server.port - 32768;
 
-        if (game == 'java' && config.ping) {
+        if (game == 'java' && config[game].ping) {
           if (response.players?.sample != null && Array.isArray(response.players.sample)) {
             for (const player of response.players.sample) {
               if (player.name == null || player.id == null || typeof player.name != 'string' || typeof player.id != 'string') continue;
@@ -314,12 +319,11 @@ async function main(game) {
         if (serverQueue.length > 0 && serverQueue.length >= 32767 / serverQueue[0].length - 1) writeServers(serverQueue.splice(0));
         if (bedrockQueue.length > 0 && bedrockQueue.length >= 32767 / bedrockQueue[0].length - 1) writeBedrock(bedrockQueue.splice(0));
       }
-      if (config.saveToFile) {
-        let stream = game == 'java' ? writeStream : bedrockStream;
+      if (config[game].saveToFile) {
         result.players = response.players;
-        if (config.compressed) {
+        if (config[game].compressed) {
           const splitIP = server.ip.split('.');
-          stream.write(Buffer.from([
+          writeStream.write(Buffer.from([
             parseInt(splitIP[0]),
             parseInt(splitIP[1]),
             parseInt(splitIP[2]),
@@ -328,7 +332,7 @@ async function main(game) {
             server.port % 256
           ]));
         } else {
-          stream.write(`${resultCount > 1 ? ',' : ''}\n${JSON.stringify(result)}`);
+          writeStream.write(`${resultCount > 1 ? ',' : ''}\n${JSON.stringify(result)}`);
         }
       }
     } catch (error) {
@@ -338,43 +342,42 @@ async function main(game) {
 
   console.log('Starting search...');
   let startTime = Date.now();
-  let total = game == 'java' ? totalServers : totalBedrock;
   const progressLog = setInterval(() => {
     const averageRate = Math.floor((Date.now() - startTime) / 1000) / serversPinged;
-    let estimatedTime = Math.floor(total - serversPinged) * averageRate;
+    let estimatedTime = Math.floor(totalServers - serversPinged) * averageRate;
     const hours = Math.floor(estimatedTime / 3600);
     estimatedTime %= 3600;
     const minutes = Math.floor(estimatedTime / 60);
     estimatedTime %= 60
     const seconds = Math.floor(estimatedTime);
-    console.log(`${serversPinged}/${total} (${Math.floor(serversPinged / total * 100)}%)  Results: ${resultCount}  Estimated ${hours > 0 ? `${hours}:${minutes < 10 ? 0 : ''}${minutes}` : minutes}:${seconds < 10 ? 0 : ''}${seconds} remaining.`)
+    console.log(`${serversPinged}/${totalServers} (${Math.floor(serversPinged / totalServers * 100)}%)  Results: ${resultCount}  Estimated ${hours > 0 ? `${hours}:${minutes < 10 ? 0 : ''}${minutes}` : minutes}:${seconds < 10 ? 0 : ''}${seconds} remaining.`)
   }, 3000);
   serversPinged = 0;
-  var startNum = Math.floor(Math.random() * total) * 6;
-  if (config.java) serverList = Buffer.concat([serverList.slice(startNum), serverList.slice(0, startNum)]);
-  if (config.bedrock) bedrockServers = Buffer.concat([bedrockServers.slice(startNum), bedrockServers.slice(0, startNum)]);
-  for (let j = 0; j < total; j++) {
+  var startNum = Math.floor(Math.random() * totalServers) * 6;
+  serverList = Buffer.concat([serverList.slice(startNum), serverList.slice(0, startNum)]);
+  for (let j = 0; j < totalServers; j++) {
     pingServer(getServer(j));
-    await new Promise(res => setTimeout(res, (1 / config.scanRate) * 1000));
+    await new Promise(res => setTimeout(res, (1 / config[game].rate) * 1000));
   }
-  await new Promise(res => setTimeout(res, config.pingTimeout));
+  await new Promise(res => setTimeout(res, config[game].timeout));
   clearInterval(progressLog);
   console.log(`Finished scanning ${resultCount} servers in ${(Date.now() - startTime) / 1000} seconds at ${new Date().toLocaleString()}.`);
-  if (config.saveToFile) {
-    let stream = game == 'java' ? writeStream : bedrockStream;
-    if (!config.compressed) stream.write('\n]');
-    stream.close();
-    console.log(`Saved results to ${stream.path}`);
+  if (config[game].saveToFile) {
+    if (!config[game].compressed) writeStream.write('\n]');
+    writeStream.close();
+    console.log(`Saved results to ${writeStream.path}`);
   }
-  if (config.repeat) timeout(main, config.repeatDelay);
-  else process.exit();
 }
 
 (async () => {
-  if (config.postgres) {
+  if (client) {
     await client.connect();
     console.log('Connected to database');
   }
-  if (config.java) main('java');
-  if (config.bedrock) main('bedrock');
+  while (true) {
+    if (config.java.scan) await main('java');
+    if (config.bedrock.scan) await main('bedrock');
+    if (config.repeat) await new Promise(res => timeout(res, config.repeatDelay));
+    else process.exit();
+  }
 })();

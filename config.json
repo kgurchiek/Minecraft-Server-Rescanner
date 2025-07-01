@@ -1,24 +1,35 @@
 {
-  "java": true,
-  "bedrock": false,
-  "ping": true,
-  "auth": false,
-  "postgres": false,
-   "sql": {
-      "host": "",
-      "port": 5432,
-      "user": "",
-      "password": "",
-      "database": ""
-  },
-  "saveToFile": true,
-  "compressed": false,
-  "repeat": false,
-  "repeatDelay": 300000,
-  "authRepeatDelay": 86400000,
-  "scanRate": 3000,
-  "pingTimeout": 3000,
-  "customIps": false,
-  "javaIps": "./ips",
-  "bedrockIps": "./ips_b"
+    "java": {
+        "scan": true,
+        "ping": true,
+        "rate": 3000,
+        "timeout": 5000,
+        "auth": false,
+        "authScanDelay": 86400000,
+        "saveToFile": true,
+        "compressed": false,
+        "postgres": false,
+        "customIps": false,
+        "ipsPath": "./ips"
+    },
+    "bedrock": {
+        "scan": false,
+        "ping": true,
+        "rate": 3000,
+        "timeout": 5000,
+        "saveToFile": true,
+        "compressed": false,
+        "postgres": false,
+        "customIps": false,
+        "ipsPath": "./ips_b"
+    },
+    "postgres": {
+        "host": "",
+        "port": 5432,
+        "user": "",
+        "password": "",
+        "database": ""
+    },
+    "repeat": false,
+    "repeatDelay": 300000
 }
