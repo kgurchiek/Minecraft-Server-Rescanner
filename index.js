@@ -8,11 +8,11 @@ let client;
 if (config.java.postgres || config.bedrock.postgres) {
   const pg = require('pg');
   client = new pg.Client({
-    host: config.sql.host,
-    port: config.sql.port,
-    user: config.sql.user,
-    password: config.sql.password,
-    database: config.sql.database,
+    host: config.postgres.host,
+    port: config.postgres.port,
+    user: config.postgres.user,
+    password: config.postgres.password,
+    database: config.postgres.database,
     ssl: {
       require: true,
       rejectUnauthorized: false
