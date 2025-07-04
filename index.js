@@ -350,7 +350,7 @@ async function main(game) {
     const minutes = Math.floor(estimatedTime / 60);
     estimatedTime %= 60
     const seconds = Math.floor(estimatedTime);
-    console.log(`${serversPinged}/${totalServers} (${Math.floor(serversPinged / totalServers * 100)}%)  Results: ${resultCount}  Estimated ${hours > 0 ? `${hours}:${minutes < 10 ? 0 : ''}${minutes}` : minutes}:${seconds < 10 ? 0 : ''}${seconds} remaining.`)
+    console.log(`[${game}] ${serversPinged}/${totalServers} (${Math.floor(serversPinged / totalServers * 100)}%)  Results: ${resultCount}  Estimated ${hours > 0 ? `${hours}:${minutes < 10 ? 0 : ''}${minutes}` : minutes}:${seconds < 10 ? 0 : ''}${seconds} remaining.`)
   }, 3000);
   serversPinged = 0;
   var startNum = Math.floor(Math.random() * totalServers) * 6;
