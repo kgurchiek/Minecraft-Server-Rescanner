@@ -77,10 +77,7 @@ module.exports = {
           if (message[0] != 0x1c || message.length < 35) return resolve('invalid');
           message = message.slice(33);
           let len = message.slice(0, 2).readUint16BE();
-          if (message.length < len + 2) {
-            console.log(message.slice(2).toString());
-            resolve('invalid');
-          }
+          if (message.length < len + 2) resolve('invalid');
           message = message.slice(2, len + 2).toString();
           let [edition, description, protocol, version, playerCount, maxPlayers, id, description2, gamemode, modeId, ipv4Port, ipv6Port] = message.split(';').map(a => a || null);
           resolve({
