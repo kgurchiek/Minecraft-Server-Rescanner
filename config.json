@@ -5,7 +5,7 @@
         "rate": 3000,
         "timeout": 5000,
         "auth": false,
-        "authScanDelay": 86400000,
+        "authScanDelay": 86400,
         "saveToFile": true,
         "compressed": false,
         "postgres": false,
