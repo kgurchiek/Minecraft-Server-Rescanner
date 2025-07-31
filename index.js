@@ -28,17 +28,18 @@ try {
     fs.unlinkSync('./lastAuth');
   }
 } catch (err) {}
+
 function timeout(func, delay, ms = 0) {
   if (ms >= delay) func();
   else setTimeout(() => { timeout(func, delay, ms + 100) }, 100);
 }
+
 function cleanDescription(description) {
   if (description == null) return null;
   if (typeof description == 'string') return cleanDescription({ text: description });
   if (typeof description != 'object') return String(description);
   if (Array.isArray(description)) return description.reduce((a, b) => a + cleanDescription(b), '');
-  let newDescription = String(description.text == null ? '' : description.text)
-+ String(description.translate == null ? '' : description.translate) + (description.extra || []).reduce((a, b) => a + cleanDescription(b), '');
+  let newDescription = String(description.text == null ? '' : description.text) + String(description.translate == null ? '' : description.translate) + (description.extra || []).reduce((a, b) => a + cleanDescription(b), '');
   description = '';
   for (let i = 0; i < newDescription.length; i++) {
     if (newDescription[i] == '§') i++;
@@ -46,6 +47,7 @@ function cleanDescription(description) {
   }
   return description;
 }
+
 async function main(game) {
   const cityLookup = await maxmind.open('./GeoLite2-City.mmdb');
   const asnLookup = await maxmind.open('./GeoLite2-ASN.mmdb');
@@ -94,14 +96,14 @@ async function main(game) {
   let playerQueue = [];
   let historyQueue = [];
   let bedrockQueue = [];
+
   function writeServers(servers) {
     // console.log('Writing servers to db');
     let placeholder = 1;
     let rows = new Array(servers.length).fill(null).map(a => `(${new Array(servers[0].length).fill(null).map(a => `$${placeholder++}`).concat([`to_tsvector('simple', $${placeholder - 14})`]).join(', ')})`).join(',');
     let params = servers.reduce((a, b) => a.concat(b), []);
     servers = [];
-    client.query(`INSERT INTO servers (ip, port, discovered, lastSeen, version,
-protocol, description, rawDescription, playerCount, playerLimit, hasFavicon, hasForgeData, enforcesSecureChat, org, country, city, lat, lon, cracked, hasPlayerSample, descriptionVector)
+    client.query(`INSERT INTO servers (ip, port, discovered, lastSeen, version, protocol, description, rawDescription, playerCount, playerLimit, hasFavicon, hasForgeData, enforcesSecureChat, org, country, city, lat, lon, cracked, hasPlayerSample, descriptionVector)
       VALUES ${rows}
       ON CONFLICT (ip, port) DO UPDATE SET
       lastSeen = excluded.lastSeen,
@@ -126,6 +128,7 @@ protocol, description, rawDescription, playerCount, playerLimit, hasFavicon, has
     )
     .catch(err => console.error('Error writing servers to db:', err))
   }
+
   async function writePlayers(players, history) {
     // console.log('Writing players to db');
     if (players.length > 0) {
@@ -141,16 +144,17 @@ protocol, description, rawDescription, playerCount, playerLimit, hasFavicon, has
     }
     if (history.length > 0) writeHistory(history);
   }
+
   function compareArray(a1, a2) {
     for (let i = 0; i < a1.length; i++) if (a1[i] != a2[i]) return false;
     return true;
   }
+
   function writeHistory(history) {
     // console.log('Writing history to db');
     let placeholder = 1;
     history = history.reduce((a, b) => a.concat(a.find(c => compareArray(b.slice(0, 4), c.slice(0, 4))) ? [] : [b]), []);
-    let rows = new Array(history.length).fill(null).map(a => `((SELECT serverId
-FROM servers WHERE ip = $${placeholder++} AND port = $${placeholder++}), (SELECT playerId FROM players WHERE name = $${placeholder++} AND id = $${placeholder++}), $${placeholder++})`).join(',');
+    let rows = new Array(history.length).fill(null).map(a => `((SELECT serverId FROM servers WHERE ip = $${placeholder++} AND port = $${placeholder++}), (SELECT playerId FROM players WHERE name = $${placeholder++} AND id = $${placeholder++}), $${placeholder++})`).join(',');
     let params = history.reduce((a, b) => a.concat(b), []);
     history = [];
     client.query(`INSERT INTO history (serverId, playerId, lastSession) VALUES ${rows}
@@ -159,10 +163,12 @@ FROM servers WHERE ip = $${placeholder++} AND port = $${placeholder++}), (SELECT
     )
     .catch(err => console.error('Error writing history to db:', err))
   }
+  
   function writeBedrock(servers) {
     // console.log('Writing servers to db');
     let placeholder = 1;
-    let rows = new Array(servers.length).fill(null).map(a => `(${new Array(servers[0].length).fill(null).map(a => `$${placeholder++}`).join(', ')})`).join(',');    let params = servers.reduce((a, b) => a.concat(b), []);
+    let rows = new Array(servers.length).fill(null).map(a => `(${new Array(servers[0].length).fill(null).map(a => `$${placeholder++}`).join(', ')})`).join(',');
+    let params = servers.reduce((a, b) => a.concat(b), []);
     servers = [];
     client.query(`INSERT INTO bedrock (ip, port, discovered, lastSeen, education, version, protocol, description, rawDescription, description2, rawDescription2, playerCount, playerLimit, gameMode, modeId, org, country, city, lat, lon)
       VALUES ${rows}
@@ -188,14 +194,17 @@ FROM servers WHERE ip = $${placeholder++} AND port = $${placeholder++}), (SELECT
     )
     .catch(err => console.error('Error writing servers to db:', err))
   }
+  
   let writeStream = config[game].saveToFile ? fs.createWriteStream(`results${game == 'java' ? '' : '_b'}${config[game].compressed ? '' : '.json'}`) : null;
   if (config[game].saveToFile && !config[game].compressed) writeStream.write('[');
+
   function getServer(i) {
-    const ip = `${serverList[i * 6]}.${serverList[(i * 6) + 1]}.${serverList[(i
-* 6) + 2]}.${serverList[(i * 6) + 3]}`;
+    const ip = `${serverList[i * 6]}.${serverList[(i * 6) + 1]}.${serverList[(i * 6) + 2]}.${serverList[(i * 6) + 3]}`;
     const port = serverList[(i * 6) + 4] * 256 + serverList[(i * 6) + 5];
+
     return { ip, port };
   }
+
   async function pingServer(server) {
     serversPinged++;
     try {
@@ -237,13 +246,16 @@ FROM servers WHERE ip = $${placeholder++} AND port = $${placeholder++}), (SELECT
           if (org != null) result['org'] = org.autonomous_system_organization;
         }
       }
+
       if (game == 'java' && scanAuth && (config[game].postgres || (config[game].saveToFile && !config[game].compressed))) {
         const auth = await authCheck(server.ip, server.port, (response.version?.protocol == null || minecraftData(response.version.protocol) == null) ? 763 : response.version.protocol, config[game].timeout);
         if (typeof auth != 'string') result.cracked = auth;
       }
+
       if (config[game].postgres) {
         let newIp = server.ip.split('.').reverse().map((a, i) => parseInt(a) * 256**i).reduce((a, b) => a + b, 0) - 2147483648;
         let newPort = server.port - 32768;
+
         if (game == 'java' && config[game].ping) {
           if (response.players?.sample != null && Array.isArray(response.players.sample)) {
             for (const player of response.players.sample) {
@@ -254,6 +266,7 @@ FROM servers WHERE ip = $${placeholder++} AND port = $${placeholder++}), (SELECT
             }
           }
         }
+        
         if (game == 'java') {
           serverQueue.push([
             newIp,
@@ -324,6 +337,7 @@ FROM servers WHERE ip = $${placeholder++} AND port = $${placeholder++}), (SELECT
       console.log(error);
     }
   }
+
   console.log('Starting search...');
   let startTime = Date.now();
   const progressLog = setInterval(() => {
@@ -352,6 +366,7 @@ FROM servers WHERE ip = $${placeholder++} AND port = $${placeholder++}), (SELECT
     console.log(`Saved results to ${writeStream.path}`);
   }
 }
+
 (async () => {
   if (client) {
     await client.connect();
