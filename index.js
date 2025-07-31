@@ -89,7 +89,7 @@ async function main(game) {
     }
   }
   let totalServers = Math.floor(serverList.length / 6);
-  console.log(`Total servers: ${totalServers}`);
+  console.log(`Total servers: ${totalServers.toLocaleString()}`);
   let serversPinged = 0;
   let resultCount = 0;
   let serverQueue = [];
@@ -97,13 +97,13 @@ async function main(game) {
   let historyQueue = [];
   let bedrockQueue = [];
 
-  function writeServers(servers) {
+  function writeServers(servers, auth) {
     // console.log('Writing servers to db');
     let placeholder = 1;
-    let rows = new Array(servers.length).fill(null).map(a => `(${new Array(servers[0].length).fill(null).map(a => `$${placeholder++}`).concat([`to_tsvector('simple', $${placeholder - 14})`]).join(', ')})`).join(',');
+    let rows = new Array(servers.length).fill(null).map(a => `(${new Array(servers[0].length).fill(null).map(a => `$${placeholder++}`).concat([`to_tsvector('simple', $${placeholder - (auth ? 14 : 13)})`]).join(', ')})`).join(',');
     let params = servers.reduce((a, b) => a.concat(b), []);
     servers = [];
-    client.query(`INSERT INTO servers (ip, port, discovered, lastSeen, version, protocol, description, rawDescription, playerCount, playerLimit, hasFavicon, hasForgeData, enforcesSecureChat, org, country, city, lat, lon, cracked, hasPlayerSample, descriptionVector)
+    client.query(`INSERT INTO servers (ip, port, discovered, lastSeen, version, protocol, description, rawDescription, playerCount, playerLimit, hasFavicon, hasForgeData, enforcesSecureChat, org, country, city, lat, lon${auth ? ', cracked' : ''}, hasPlayerSample, descriptionVector)
       VALUES ${rows}
       ON CONFLICT (ip, port) DO UPDATE SET
       lastSeen = excluded.lastSeen,
@@ -121,7 +121,7 @@ async function main(game) {
       city = excluded.city,
       lat = excluded.lat,
       lon = excluded.lon,
-      cracked = excluded.cracked,
+      ${auth ? 'cracked = excluded.cracked,' : ''}
       hasPlayerSample = excluded.hasPlayerSample,
       descriptionVector = excluded.descriptionVector;`,
       params
@@ -266,7 +266,7 @@ async function main(game) {
             }
           }
         }
-        
+
         if (game == 'java') {
           serverQueue.push([
             newIp,
@@ -286,10 +286,11 @@ async function main(game) {
             result.geo?.country,
             result.geo?.city,
             result.geo?.lat,
-            result.geo?.lon,
-            result.cracked,
-            result.players?.sample != null
-          ]);
+            result.geo?.lon
+          ].concat(
+            scanAuth ? [result.cracked] : [],
+            [result.players?.sample != null]
+          ));
         } else {
           bedrockQueue.push([
             newIp,
@@ -314,7 +315,7 @@ async function main(game) {
             Number(result.geo?.lon)
           ].map(a => (typeof a == 'number' && isNaN(a)) ? null : a));
         }
-        if (serverQueue.length > 0 && serverQueue.length >= 32767 / serverQueue[0].length - 1) writeServers(serverQueue.splice(0));
+        if (serverQueue.length > 0 && serverQueue.length >= 32767 / serverQueue[0].length - 1) writeServers(serverQueue.splice(0), scanAuth);
         if (bedrockQueue.length > 0 && bedrockQueue.length >= 32767 / bedrockQueue[0].length - 1) writeBedrock(bedrockQueue.splice(0));
       }
       if (config[game].saveToFile) {
