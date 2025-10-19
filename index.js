@@ -445,6 +445,11 @@ async function main(game) {
 
 (async () => {
   if (pool) {
+    pool.on('connect', client => {
+      client.query(`SET statement_timeout = ${config.postgres.timeout}`).catch(err => {
+        console.error('Failed to set statement_timeout for upsert pool:', err);
+      });
+    });
     await pool.connect();
     console.log('Connected to database');
   }

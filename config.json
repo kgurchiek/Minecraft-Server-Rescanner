@@ -30,6 +30,7 @@
         "user": "",
         "password": "",
         "database": "",
+        "timeout": 0,
         "batch": {
             "java": {
                 "servers": 3000,
