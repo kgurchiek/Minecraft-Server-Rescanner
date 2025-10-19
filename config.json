@@ -1,4 +1,5 @@
 {
+    "writeLogs": true,
     "java": {
         "scan": true,
         "ping": true,
@@ -28,7 +29,21 @@
         "port": 5432,
         "user": "",
         "password": "",
-        "database": ""
+        "database": "",
+        "batch": {
+            "java": {
+                "servers": 3000,
+                "players": 3000
+            },
+            "bedrock": {
+                "servers": 3000
+            }
+        }
+    },
+    "maxmind": {
+        "update": false,
+        "userId": "",
+        "licenseKey": ""
     },
     "repeat": false,
     "repeatDelay": 300000

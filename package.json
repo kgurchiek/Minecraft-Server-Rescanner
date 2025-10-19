@@ -1,8 +1,9 @@
 {
   "dependencies": {
-    "maxmind": "^4.3.24",
+    "maxmind": "^4.3.29",
     "minecraft-data": "^3.85.0",
     "pg": "^8.14.1",
+    "tar": "^7.5.1",
     "varint": "^6.0.0"
   }
 }

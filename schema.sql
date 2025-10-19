@@ -2,12 +2,13 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 16.9 (Ubuntu 16.9-0ubuntu0.24.04.1)
--- Dumped by pg_dump version 16.9 (Ubuntu 16.9-0ubuntu0.24.04.1)
+-- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -26,13 +27,41 @@ CREATE SCHEMA pgtle;
 ALTER SCHEMA pgtle OWNER TO postgres;
 
 --
+-- Name: pg_stat_statements; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION pg_stat_statements; Type: COMMENT; Schema: -; Owner: 
+--
+
+COMMENT ON EXTENSION pg_stat_statements IS 'track planning and execution statistics of all SQL statements executed';
+
+
+--
+-- Name: pg_trgm; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION pg_trgm; Type: COMMENT; Schema: -; Owner: 
+--
+
+COMMENT ON EXTENSION pg_trgm IS 'text similarity measurement and index searching based on trigrams';
+
+
+--
 -- Name: server; Type: TYPE; Schema: public; Owner: postgres
 --
 
 CREATE TYPE public.server AS (
-        ip integer,
-        port smallint,
-        lastseen bigint
+	ip integer,
+	port smallint,
+	lastseen bigint
 );
 
 
@@ -180,7 +209,6 @@ ALTER TABLE public.servers OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.servers_serverid_seq
-    AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -345,6 +373,34 @@ CREATE INDEX bedrock_protocol ON public.bedrock USING btree (protocol);
 
 
 --
+-- Name: country_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX country_index ON public.servers USING btree (country);
+
+
+--
+-- Name: cracked_active_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX cracked_active_index ON public.servers USING btree (cracked) WHERE (cracked IS NOT NULL);
+
+
+--
+-- Name: cracked_lastseen_desc_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX cracked_lastseen_desc_index ON public.servers USING btree (lastseen DESC) WHERE (cracked IS NOT NULL);
+
+
+--
+-- Name: description_trgm_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX description_trgm_index ON public.servers USING gin (description public.gin_trgm_ops);
+
+
+--
 -- Name: descriptionvector_index; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -394,6 +450,13 @@ CREATE INDEX ip_index ON public.servers USING btree (ip);
 
 
 --
+-- Name: lastseen_desc_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX lastseen_desc_index ON public.servers USING btree (lastseen DESC);
+
+
+--
 -- Name: lastseen_index; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -426,6 +489,13 @@ CREATE INDEX lon_index ON public.servers USING btree (lon);
 --
 
 CREATE INDEX name_index ON public.players USING btree (name);
+
+
+--
+-- Name: org_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX org_index ON public.servers USING btree (org);
 
 
 --
@@ -478,6 +548,34 @@ CREATE INDEX serverid_index ON public.servers USING btree (serverid);
 
 
 --
+-- Name: version_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX version_index ON public.servers USING btree (version);
+
+
+--
+-- Name: version_trgm_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX version_trgm_index ON public.servers USING gin (version public.gin_trgm_ops);
+
+
+--
+-- Name: whitelisted_active_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX whitelisted_active_index ON public.servers USING btree (whitelisted) WHERE (whitelisted IS NOT NULL);
+
+
+--
+-- Name: whitelisted_lastseen_desc_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX whitelisted_lastseen_desc_index ON public.servers USING btree (lastseen DESC) WHERE (whitelisted IS NOT NULL);
+
+
+--
 -- Name: history history_playerid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -496,3 +594,4 @@ ALTER TABLE ONLY public.history
 --
 -- PostgreSQL database dump complete
 --
+

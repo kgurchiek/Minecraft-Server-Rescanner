@@ -1,13 +1,15 @@
 // Fetches dependencies and inits variables
 const config = require('./config.json');
+const path = require('path');
 const fs = require('fs');
+const tar = require('tar');
 const maxmind = require('maxmind');
 const minecraftData = require('minecraft-data');
 const { ping, bedrockPing, authCheck } = require('./ping.js');
-let client;
+let pool;
 if (config.java.postgres || config.bedrock.postgres) {
   const pg = require('pg');
-  client = new pg.Client({
+  pool = new pg.Pool({
     host: config.postgres.host,
     port: config.postgres.port,
     user: config.postgres.user,
@@ -48,12 +50,84 @@ function cleanDescription(description) {
   return description;
 }
 
+async function extractTar(buf, dir) {
+    const tmpName = `mmdb_${Date.now()}_${Math.random().toString(36).slice(2)}.tar.gz`;
+    const tmpPath = path.join(__dirname, tmpName);
+    await fs.promises.writeFile(tmpPath, buf);
+    try {
+      const filter = (entryPath) => entryPath.endsWith('.mmdb');
+      await tar.x({ file: tmpPath, cwd: dir, strip: 1, filter });
+    } finally {
+      await fs.promises.unlink(tmpPath).catch(() => {});
+    }
+}
+
+async function updateMaxmind() {
+  let lastUpdate = fs.statSync('GeoLite2-City.mmdb').mtimeMs;
+  let response = await fetch('https://download.maxmind.com/geoip/databases/GeoLite2-City/download?suffix=tar.gz', {
+    method: 'HEAD',
+    headers: {
+      Authorization: `Basic ${btoa(`${config.maxmind.userId}:${config.maxmind.licenseKey}`)}`
+    }
+  });
+  if (response.status != 200) {
+    console.error(`Error fetching MaxMind database (code ${response.status})`);
+    process.exit();
+  }
+  let newUpdate = new Date(response.headers.get('last-modified')).getTime();
+  if (newUpdate > lastUpdate) {
+    let city = await fetch('https://download.maxmind.com/geoip/databases/GeoLite2-City/download?suffix=tar.gz', {
+      method: 'GET',
+      headers: {
+        Authorization: `Basic ${btoa(`${config.maxmind.userId}:${config.maxmind.licenseKey}`)}`
+      }
+    });
+    if (city.status == 200) {
+      let buf = Buffer.from(await city.arrayBuffer());
+      await extractTar(buf, '.');
+    } else {
+      console.error(`Error fetching MaxMind database (code ${city.status})`);
+      process.exit();
+    }
+  }
+
+  lastUpdate = fs.statSync('GeoLite2-ASN.mmdb').mtimeMs;
+  response = await fetch('https://download.maxmind.com/geoip/databases/GeoLite2-City/download?suffix=tar.gz', {
+    method: 'HEAD',
+    headers: { 
+      Authorization: `Basic ${btoa(`${config.maxmind.userId}:${config.maxmind.licenseKey}`)}`
+    }
+  });
+  if (response.status != 200) {
+    console.error(`Error fetching MaxMind database (code ${response.status})`);
+    process.exit();
+  }
+  newUpdate = new Date(response.headers.get('last-modified')).getTime();
+  if (newUpdate > lastUpdate) {
+    let asn = await fetch('https://download.maxmind.com/geoip/databases/GeoLite2-ASN/download?suffix=tar.gz', {
+      method: 'GET',
+      headers: {
+        Authorization: `Basic ${btoa(`${config.maxmind.userId}:${config.maxmind.licenseKey}`)}`
+      }
+    });
+    if (asn.status == 200) {
+      let buf = Buffer.from(await asn.arrayBuffer());
+      await extractTar(buf, '.');
+    }
+    else {
+      console.error(`Error fetching MaxMind database (code ${asn.status})`);
+      process.exit();
+    }
+  }
+}
+
 async function main(game) {
+  if (config.maxmind.update) await updateMaxmind();
   const cityLookup = await maxmind.open('./GeoLite2-City.mmdb');
   const asnLookup = await maxmind.open('./GeoLite2-ASN.mmdb');
   let scanAuth = config.java.auth && Date.now() / 1000 >= lastAuth + config.java.authScanDelay;
   if (scanAuth) {
-    console.log('Auth scan');
+    console.log(`[${game}] Auth scan`);
     lastAuth = Math.round(Date.now() / 1000);
     let buf = Buffer.alloc(8);
     buf.writeBigUInt64BE(BigInt(lastAuth));
@@ -89,7 +163,7 @@ async function main(game) {
     }
   }
   let totalServers = Math.floor(serverList.length / 6);
-  console.log(`Total servers: ${totalServers.toLocaleString()}`);
+  console.log(`[${game}] Total servers: ${totalServers.toLocaleString()}`);
   let serversPinged = 0;
   let resultCount = 0;
   let serverQueue = [];
@@ -98,12 +172,12 @@ async function main(game) {
   let bedrockQueue = [];
 
   function writeServers(servers, auth) {
-    // console.log('Writing servers to db');
+    if (config.writeLogs) console.log(`[${game}] Writing servers...`);
     let placeholder = 1;
     let rows = new Array(servers.length).fill(null).map(a => `(${new Array(servers[0].length).fill(null).map(a => `$${placeholder++}`).concat([`to_tsvector('simple', $${placeholder - (auth ? 14 : 13)})`]).join(', ')})`).join(',');
     let params = servers.reduce((a, b) => a.concat(b), []);
     servers = [];
-    client.query(`INSERT INTO servers (ip, port, discovered, lastSeen, version, protocol, description, rawDescription, playerCount, playerLimit, hasFavicon, hasForgeData, enforcesSecureChat, org, country, city, lat, lon${auth ? ', cracked' : ''}, hasPlayerSample, descriptionVector)
+    pool.query(`INSERT INTO servers (ip, port, discovered, lastSeen, version, protocol, description, rawDescription, playerCount, playerLimit, hasFavicon, hasForgeData, enforcesSecureChat, org, country, city, lat, lon${auth ? ', cracked' : ''}, hasPlayerSample, descriptionVector)
       VALUES ${rows}
       ON CONFLICT (ip, port) DO UPDATE SET
       lastSeen = excluded.lastSeen,
@@ -130,14 +204,14 @@ async function main(game) {
   }
 
   async function writePlayers(players, history) {
-    // console.log('Writing players to db');
+    if (config.writeLogs) console.log(`[${game}] Writing players...`);
     if (players.length > 0) {
       try {
         let placeholder = 1;
         let rows = new Array(players.length).fill(null).map(a => `(${new Array(players[0].length).fill(null).map(a => `$${placeholder++}`).join(', ')})`).join(',');
         let params = players.reduce((a, b) => a.concat(b), []);
         players = [];
-        await client.query(`INSERT INTO players (name, id) VALUES ${rows} ON CONFLICT (name, id) DO NOTHING;`, params)
+        await pool.query(`INSERT INTO players (name, id) VALUES ${rows} ON CONFLICT (name, id) DO NOTHING;`, params)
       } catch (err) {
         console.error('Error writing players to db:', err);
       }
@@ -151,13 +225,13 @@ async function main(game) {
   }
 
   function writeHistory(history) {
-    // console.log('Writing history to db');
+    if (config.writeLogs) console.log(`[${game}] Writing player history...`);
     let placeholder = 1;
     history = history.reduce((a, b) => a.concat(a.find(c => compareArray(b.slice(0, 4), c.slice(0, 4))) ? [] : [b]), []);
     let rows = new Array(history.length).fill(null).map(a => `((SELECT serverId FROM servers WHERE ip = $${placeholder++} AND port = $${placeholder++}), (SELECT playerId FROM players WHERE name = $${placeholder++} AND id = $${placeholder++}), $${placeholder++})`).join(',');
     let params = history.reduce((a, b) => a.concat(b), []);
     history = [];
-    client.query(`INSERT INTO history (serverId, playerId, lastSession) VALUES ${rows}
+    pool.query(`INSERT INTO history (serverId, playerId, lastSession) VALUES ${rows}
       ON CONFLICT (serverId, playerId) DO UPDATE SET lastSession = excluded.lastSession;`,
       params
     )
@@ -165,12 +239,12 @@ async function main(game) {
   }
   
   function writeBedrock(servers) {
-    // console.log('Writing servers to db');
+    if (config.writeLogs) console.log(`[${game}] Writing servers...`);
     let placeholder = 1;
     let rows = new Array(servers.length).fill(null).map(a => `(${new Array(servers[0].length).fill(null).map(a => `$${placeholder++}`).join(', ')})`).join(',');
     let params = servers.reduce((a, b) => a.concat(b), []);
     servers = [];
-    client.query(`INSERT INTO bedrock (ip, port, discovered, lastSeen, education, version, protocol, description, rawDescription, description2, rawDescription2, playerCount, playerLimit, gameMode, modeId, org, country, city, lat, lon)
+    pool.query(`INSERT INTO bedrock (ip, port, discovered, lastSeen, education, version, protocol, description, rawDescription, description2, rawDescription2, playerCount, playerLimit, gameMode, modeId, org, country, city, lat, lon)
       VALUES ${rows}
       ON CONFLICT (ip, port) DO UPDATE SET
       lastSeen = excluded.lastSeen,
@@ -211,7 +285,7 @@ async function main(game) {
       let result = {};
       let response = await (game == 'java' ? ping : bedrockPing)(server.ip, server.port, 0, config[game].timeout);
       let lastSeen = Math.floor(Date.now() / 1000);
-      if (typeof response !== 'object') return;
+      if (response == null || typeof response != 'object') return;
       resultCount++;
       if (config[game].ping) {
         if (config[game].postgres || (config[game].saveToFile && !config[game].compressed)) {
@@ -262,7 +336,7 @@ async function main(game) {
               if (player.name == null || player.id == null || typeof player.name != 'string' || typeof player.id != 'string') continue;
               playerQueue.push([player.name, player.id]);
               historyQueue.push([newIp, newPort, player.name, player.id, result.lastSeen]);
-              if ((playerQueue.length > 0 && playerQueue.length >= 32767 / playerQueue[0].length - 1) || (historyQueue.length > 0 && historyQueue.length >= 32767 / historyQueue[0].length - 1)) writePlayers(playerQueue.splice(0), historyQueue.splice(0));
+              if (playerQueue.length > 0 && playerQueue.length >= config.postgres.batch.java.players) writePlayers(playerQueue.splice(0), historyQueue.splice(0));
             }
           }
         }
@@ -315,8 +389,9 @@ async function main(game) {
             Number(result.geo?.lon)
           ].map(a => (typeof a == 'number' && isNaN(a)) ? null : a));
         }
-        if (serverQueue.length > 0 && serverQueue.length >= 32767 / serverQueue[0].length - 1) writeServers(serverQueue.splice(0), scanAuth);
-        if (bedrockQueue.length > 0 && bedrockQueue.length >= 32767 / bedrockQueue[0].length - 1) writeBedrock(bedrockQueue.splice(0));
+
+        if (serverQueue.length > 0 && serverQueue.length >= config.postgres.batch.java.servers) writeServers(serverQueue.splice(0), scanAuth);
+        if (bedrockQueue.length > 0 && bedrockQueue.length >= config.postgres.batch.bedrock.servers) writeBedrock(bedrockQueue.splice(0));
       }
       if (config[game].saveToFile) {
         result.players = response.players;
@@ -339,7 +414,7 @@ async function main(game) {
     }
   }
 
-  console.log('Starting search...');
+  console.log(`[${game}] Starting search...`);
   let startTime = Date.now();
   const progressLog = setInterval(() => {
     const averageRate = Math.floor((Date.now() - startTime) / 1000) / serversPinged;
@@ -360,17 +435,17 @@ async function main(game) {
   }
   await new Promise(res => setTimeout(res, config[game].timeout));
   clearInterval(progressLog);
-  console.log(`Finished scanning ${resultCount} servers in ${(Date.now() - startTime) / 1000} seconds at ${new Date().toLocaleString()}.`);
+  console.log(`[${game}] Finished scanning ${resultCount} servers in ${(Date.now() - startTime) / 1000} seconds at ${new Date().toLocaleString()}.`);
   if (config[game].saveToFile) {
     if (!config[game].compressed) writeStream.write('\n]');
     writeStream.close();
-    console.log(`Saved results to ${writeStream.path}`);
+    console.log(`[${game}] Saved results to ${writeStream.path}`);
   }
 }
 
 (async () => {
-  if (client) {
-    await client.connect();
+  if (pool) {
+    await pool.connect();
     console.log('Connected to database');
   }
   while (true) {
