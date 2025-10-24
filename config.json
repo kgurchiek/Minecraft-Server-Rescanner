@@ -30,6 +30,7 @@
         "user": "",
         "password": "",
         "database": "",
+        "maxConnections": 10,
         "timeout": 0,
         "batch": {
             "java": {

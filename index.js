@@ -15,6 +15,7 @@ if (config.java.postgres || config.bedrock.postgres) {
     user: config.postgres.user,
     password: config.postgres.password,
     database: config.postgres.database,
+    max: config.postgres.maxConnections,
     ssl: {
       require: true,
       rejectUnauthorized: false
