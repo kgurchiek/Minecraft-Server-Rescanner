@@ -451,8 +451,13 @@ async function main(game) {
         console.error('Failed to set statement_timeout for upsert pool:', err);
       });
     });
-    await pool.connect();
-    console.log('Connected to database');
+    try {
+      await pool.query('SELECT 1');
+      console.log('Connected to database');
+    } catch (err) {
+      console.error('Error connecting to database:', err);
+      process.exit(1);
+    }
   }
   while (true) {
     if (config.java.scan) await main('java');
