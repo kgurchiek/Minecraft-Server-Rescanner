@@ -1,5 +1,5 @@
 {
-    "writeLogs": true,
+    "writeLogs": false,
     "java": {
         "scan": true,
         "ping": true,
@@ -34,11 +34,11 @@
         "timeout": 0,
         "batch": {
             "java": {
-                "servers": 3000,
-                "players": 3000
+                "servers": 100,
+                "players": 100
             },
             "bedrock": {
-                "servers": 3000
+                "servers": 100
             }
         }
     },
