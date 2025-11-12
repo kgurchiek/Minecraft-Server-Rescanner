@@ -71,10 +71,8 @@ async function updateMaxmind() {
       Authorization: `Basic ${btoa(`${config.maxmind.userId}:${config.maxmind.licenseKey}`)}`
     }
   });
-  if (response.status != 200) {
-    console.error(`Error fetching MaxMind database (code ${response.status})`);
-    process.exit();
-  }
+  if (response.status != 200) return console.error(`Error fetching MaxMind database (code ${response.status})`);
+
   let newUpdate = new Date(response.headers.get('last-modified')).getTime();
   if (newUpdate > lastUpdate) {
     let city = await fetch('https://download.maxmind.com/geoip/databases/GeoLite2-City/download?suffix=tar.gz', {
@@ -86,11 +84,9 @@ async function updateMaxmind() {
     if (city.status == 200) {
       let buf = Buffer.from(await city.arrayBuffer());
       await extractTar(buf, '.');
-    } else {
-      console.error(`Error fetching MaxMind database (code ${city.status})`);
-      process.exit();
-    }
+    } else return console.error(`Error fetching MaxMind database (code ${city.status})`);
   }
+
 
   lastUpdate = fs.statSync('GeoLite2-ASN.mmdb').mtimeMs;
   response = await fetch('https://download.maxmind.com/geoip/databases/GeoLite2-City/download?suffix=tar.gz', {
@@ -99,10 +95,8 @@ async function updateMaxmind() {
       Authorization: `Basic ${btoa(`${config.maxmind.userId}:${config.maxmind.licenseKey}`)}`
     }
   });
-  if (response.status != 200) {
-    console.error(`Error fetching MaxMind database (code ${response.status})`);
-    process.exit();
-  }
+  if (response.status != 200) return console.error(`Error fetching MaxMind database (code ${response.status})`);
+
   newUpdate = new Date(response.headers.get('last-modified')).getTime();
   if (newUpdate > lastUpdate) {
     let asn = await fetch('https://download.maxmind.com/geoip/databases/GeoLite2-ASN/download?suffix=tar.gz', {
@@ -115,10 +109,7 @@ async function updateMaxmind() {
       let buf = Buffer.from(await asn.arrayBuffer());
       await extractTar(buf, '.');
     }
-    else {
-      console.error(`Error fetching MaxMind database (code ${asn.status})`);
-      process.exit();
-    }
+    else return console.error(`Error fetching MaxMind database (code ${asn.status})`);
   }
 }
 
