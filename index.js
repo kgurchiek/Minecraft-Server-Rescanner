@@ -275,7 +275,7 @@ async function main(game) {
         serversPinged++;
         try {
             let result = {};
-            let response = await (game == 'java' ? ping : bedrockPing)(server.ip, server.port, 0, config[game].timeout);
+            let response = await (game == 'java' ? ping : bedrockPing)(server.ip, server.port, 774, config[game].timeout);
             let lastSeen = Math.floor(Date.now() / 1000);
             if (response == null || typeof response != 'object') return;
             resultCount++;
@@ -416,7 +416,7 @@ async function main(game) {
         const minutes = Math.floor(estimatedTime / 60);
         estimatedTime %= 60
         const seconds = Math.floor(estimatedTime);
-        console.log(`[${game}] ${serversPinged}/${totalServers} (${Math.floor(serversPinged / totalServers * 100)}%)    Results: ${resultCount}    Estimated ${hours > 0 ? `${hours}:${minutes < 10 ? 0 : ''}${minutes}` : minutes}:${seconds < 10 ? 0 : ''}${seconds} remaining.`)
+        console.log(`[${game}] ${serversPinged}/${totalServers} (${Math.floor(serversPinged / totalServers * 100)}%)  Results: ${resultCount}  Estimated ${hours > 0 ? `${hours}:${minutes < 10 ? 0 : ''}${minutes}` : minutes}:${seconds < 10 ? 0 : ''}${seconds} remaining.`)
     }, 3000);
     serversPinged = 0;
     var startNum = Math.floor(Math.random() * totalServers) * 6;
@@ -453,7 +453,6 @@ async function main(game) {
     while (true) {
         if (config.java.scan) await main('java');
         if (config.bedrock.scan) await main('bedrock');
-        if (config.repeat) await new Promise(res => timeout(res, config.repeatDelay));
-        else process.exit();
+        process.exit();
     }
 })();

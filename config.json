@@ -46,7 +46,5 @@
         "update": false,
         "userId": "",
         "licenseKey": ""
-    },
-    "repeat": false,
-    "repeatDelay": 300000
+    }
 }
