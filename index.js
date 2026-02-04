@@ -444,7 +444,7 @@ async function main(game) {
         estimatedTime %= 60
         const seconds = Math.floor(estimatedTime);
         let queueLogs = [...(game == 'java' ? [[serverQueue.length, 'Servers'], [playerQueue.length, 'Players'], [historyQueue.length, 'Player History']] : []), ...(game == 'bedrock' ? [[bedrockQueue.length, 'Servers']] : [])];
-        console.log(`[${game}] ${serversPinged}/${totalServers} (${Math.floor(serversPinged / totalServers * 100)}%)  Results: ${resultCount}  Estimated ${hours > 0 ? `${hours}:${minutes < 10 ? 0 : ''}${minutes}` : minutes}:${seconds < 10 ? 0 : ''}${seconds} remaining.  ${config[game].postgres ? `Postgres Queues: ${queueLogs.map(a => `${a[1]}: ${a[0]}`).join('  ')}` : ''}`);
+        console.log(`[${game}] ${serversPinged}/${totalServers} (${Math.floor(serversPinged / totalServers * 100)}%)  Results: ${resultCount}  Estimated ${hours > 0 ? `${hours}:${minutes < 10 ? 0 : ''}${minutes}` : minutes}:${seconds < 10 ? 0 : ''}${seconds} remaining.${config[game].postgres ? `  Queues: ${queueLogs.map(a => `${a[1]}: ${a[0]}`).join(', ')}` : ''}`);
     }, 3000);
     serversPinged = 0;
     var startNum = Math.floor(Math.random() * totalServers) * 6;
