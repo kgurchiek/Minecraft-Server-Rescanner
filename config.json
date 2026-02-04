@@ -34,11 +34,20 @@
         "timeout": 0,
         "batch": {
             "java": {
-                "servers": 100,
-                "players": 100
+                "servers": {
+                    "min": 100,
+                    "max": 1000
+                },
+                "players": {
+                    "min": 100,
+                    "max": 1000
+                }
             },
             "bedrock": {
-                "servers": 100
+                "servers": {
+                    "min": 100,
+                    "max": 1000
+                }
             }
         }
     },

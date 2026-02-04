@@ -32,11 +32,6 @@ try {
     }
 } catch (err) {}
 
-function timeout(func, delay, ms = 0) {
-    if (ms >= delay) func();
-    else setTimeout(() => { timeout(func, delay, ms + 100) }, 100);
-}
-
 function cleanDescription(description) {
     if (description == null) return null;
     if (typeof description == 'string') return cleanDescription({ text: description });
@@ -113,7 +108,13 @@ async function updateMaxmind() {
     }
 }
 
+function compareArray(a1, a2) {
+    for (let i = 0; i < a1.length; i++) if (a1[i] != a2[i]) return false;
+    return true;
+}
+
 async function main(game) {
+    let finished = false;
     if (config.maxmind.update) await updateMaxmind();
     const cityLookup = await maxmind.open('./GeoLite2-City.mmdb');
     const asnLookup = await maxmind.open('./GeoLite2-ASN.mmdb');
@@ -163,103 +164,133 @@ async function main(game) {
     let historyQueue = [];
     let bedrockQueue = [];
 
-    function writeServers(servers, auth) {
-        if (config.writeLogs) console.log(`[${game}] Writing servers...`);
+    async function writeServers(servers, auth) {
+        let size = servers.length;
         let placeholder = 1;
         let rows = new Array(servers.length).fill(null).map(a => `(${new Array(servers[0].length).fill(null).map(a => `$${placeholder++}`).concat([`to_tsvector('simple', $${placeholder - (auth ? 14 : 13)})`]).join(', ')})`).join(',');
         let params = servers.reduce((a, b) => a.concat(b), []);
-        servers = [];
-        pool.query(`INSERT INTO servers (ip, port, discovered, lastSeen, version, protocol, description, rawDescription, playerCount, playerLimit, hasFavicon, hasForgeData, enforcesSecureChat, org, country, city, lat, lon${auth ? ', cracked' : ''}, hasPlayerSample, descriptionVector)
-            VALUES ${rows}
-            ON CONFLICT (ip, port) DO UPDATE SET
-            lastSeen = excluded.lastSeen,
-            version = excluded.version,
-            protocol = excluded.protocol,
-            description = excluded.description,
-            rawDescription = excluded.rawDescription,
-            playerCount = excluded.playerCount,
-            playerLimit = excluded.playerLimit,
-            hasFavicon = excluded.hasFavicon,
-            hasForgeData = excluded.hasForgeData,
-            enforcesSecureChat = excluded.enforcesSecureChat,
-            org = excluded.org,
-            country = excluded.country,
-            city = excluded.city,
-            lat = excluded.lat,
-            lon = excluded.lon,
-            ${auth ? 'cracked = excluded.cracked,' : ''}
-            hasPlayerSample = excluded.hasPlayerSample,
-            descriptionVector = excluded.descriptionVector;`,
-            params
-        )
-        .catch(err => console.error('Error writing servers to db:', err))
+        if (config.writeLogs) console.log(`[${game}] Writing ${size} servers...`);
+        servers.length = 0;
+        try {
+            await pool.query(`INSERT INTO servers (ip, port, discovered, lastSeen, version, protocol, description, rawDescription, playerCount, playerLimit, hasFavicon, hasForgeData, enforcesSecureChat, org, country, city, lat, lon${auth ? ', cracked' : ''}, hasPlayerSample, descriptionVector)
+                VALUES ${rows}
+                ON CONFLICT (ip, port) DO UPDATE SET
+                lastSeen = excluded.lastSeen,
+                version = excluded.version,
+                protocol = excluded.protocol,
+                description = excluded.description,
+                rawDescription = excluded.rawDescription,
+                playerCount = excluded.playerCount,
+                playerLimit = excluded.playerLimit,
+                hasFavicon = excluded.hasFavicon,
+                hasForgeData = excluded.hasForgeData,
+                enforcesSecureChat = excluded.enforcesSecureChat,
+                org = excluded.org,
+                country = excluded.country,
+                city = excluded.city,
+                lat = excluded.lat,
+                lon = excluded.lon,
+                ${auth ? 'cracked = excluded.cracked,' : ''}
+                hasPlayerSample = (servers.hasPlayerSample OR excluded.hasPlayerSample),
+                descriptionVector = excluded.descriptionVector;`,
+                params
+            )
+        } catch (err) {
+            console.error('Error writing servers to db:', { rows: rows.length, params: params.length }, err)
+        }
+        if (config.writeLogs) console.log(`[${game}] Finished writing ${size} servers.`);
     }
+
+    async function handleServersQueue() {
+        if (serverQueue.length > 0 && (finished || serverQueue.length >= config.postgres.batch.java.servers.min)) await writeServers(serverQueue.splice(0, config.postgres.batch.java.servers.max), scanAuth);
+        setTimeout(handleServersQueue);
+    }
+    handleServersQueue();
 
     async function writePlayers(players, history) {
-        if (config.writeLogs) console.log(`[${game}] Writing players...`);
+        let size = players.length;
+        if (config.writeLogs) console.log(`[${game}] Writing ${size} players...`);
         if (players.length > 0) {
+            let placeholder = 1;
+            let rows = new Array(players.length).fill(null).map(a => `(${new Array(players[0].length).fill(null).map(a => `$${placeholder++}`).join(', ')})`).join(',');
+            let params = players.reduce((a, b) => a.concat(b), []);
+            players.length = 0;
             try {
-                let placeholder = 1;
-                let rows = new Array(players.length).fill(null).map(a => `(${new Array(players[0].length).fill(null).map(a => `$${placeholder++}`).join(', ')})`).join(',');
-                let params = players.reduce((a, b) => a.concat(b), []);
-                players = [];
                 await pool.query(`INSERT INTO players (name, id) VALUES ${rows} ON CONFLICT (name, id) DO NOTHING;`, params)
             } catch (err) {
-                console.error('Error writing players to db:', err);
+                console.error('Error writing players to db:', { rows: rows.length, params: params.length }, err);
             }
         }
-        if (history.length > 0) writeHistory(history);
+        if (config.writeLogs) console.log(`[${game}] Finished writing ${size} players.`);
+        if (history.length > 0) await writeHistory(history);
     }
 
-    function compareArray(a1, a2) {
-        for (let i = 0; i < a1.length; i++) if (a1[i] != a2[i]) return false;
-        return true;
-    }
-
-    function writeHistory(history) {
-        if (config.writeLogs) console.log(`[${game}] Writing player history...`);
+    async function writeHistory(history) {
+        let size = history.length;
+        if (config.writeLogs) console.log(`[${game}] Writing history for ${size} players...`);
         let placeholder = 1;
         history = history.reduce((a, b) => a.concat(a.find(c => compareArray(b.slice(0, 4), c.slice(0, 4))) ? [] : [b]), []);
         let rows = new Array(history.length).fill(null).map(a => `((SELECT serverId FROM servers WHERE ip = $${placeholder++} AND port = $${placeholder++}), (SELECT playerId FROM players WHERE name = $${placeholder++} AND id = $${placeholder++}), $${placeholder++})`).join(',');
         let params = history.reduce((a, b) => a.concat(b), []);
-        history = [];
-        pool.query(`INSERT INTO history (serverId, playerId, lastSession) VALUES ${rows}
-            ON CONFLICT (serverId, playerId) DO UPDATE SET lastSession = excluded.lastSession;`,
-            params
-        )
-        .catch(err => console.error('Error writing history to db:', err))
+        history.length = 0;
+        try {
+            await pool.query(`INSERT INTO history (serverId, playerId, lastSession) VALUES ${rows}
+                ON CONFLICT (serverId, playerId) DO UPDATE SET lastSession = excluded.lastSession;`,
+                params
+            )
+        } catch (err) {
+            console.error('Error writing history to db:', { rows: rows.length, params: params.length }, err)
+        }
+        if (config.writeLogs) console.log(`[${game}] Finished writing history for ${size} players.`);
     }
+
+    async function handlePlayersQueue() {
+        if (playerQueue.length > 0 && (finished || playerQueue.length >= config.postgres.batch.java.players.min)) await writePlayers(playerQueue.splice(0, config.postgres.batch.java.players.max), historyQueue.splice(0, config.postgres.batch.java.players.max));
+        setTimeout(handlePlayersQueue);
+    }
+    handlePlayersQueue();
     
-    function writeBedrock(servers) {
-        if (config.writeLogs) console.log(`[${game}] Writing servers...`);
+    async function writeBedrock(servers) {
+        let size = servers.length;
+        if (config.writeLogs) console.log(`[${game}] Writing ${size} servers...`);
         let placeholder = 1;
         let rows = new Array(servers.length).fill(null).map(a => `(${new Array(servers[0].length).fill(null).map(a => `$${placeholder++}`).join(', ')})`).join(',');
         let params = servers.reduce((a, b) => a.concat(b), []);
-        servers = [];
-        pool.query(`INSERT INTO bedrock (ip, port, discovered, lastSeen, education, version, protocol, description, rawDescription, description2, rawDescription2, playerCount, playerLimit, gameMode, modeId, org, country, city, lat, lon)
-            VALUES ${rows}
-            ON CONFLICT (ip, port) DO UPDATE SET
-            lastSeen = excluded.lastSeen,
-            education = excluded.education,
-            version = excluded.version,
-            protocol = excluded.protocol,
-            description = excluded.description,
-            rawDescription = excluded.rawDescription,
-            description2 = excluded.description2,
-            rawDescription2 = excluded.rawDescription2,
-            playerCount = excluded.playerCount,
-            playerLimit = excluded.playerLimit,
-            gameMode = excluded.gameMode,
-            modeId = excluded.modeId,
-            org = excluded.org,
-            country = excluded.country,
-            city = excluded.city,
-            lat = excluded.lat,
-            lon = excluded.lon;`,
-            params
-        )
-        .catch(err => console.error('Error writing servers to db:', err))
+        servers.length = 0;
+        try {
+            await pool.query(`INSERT INTO bedrock (ip, port, discovered, lastSeen, education, version, protocol, description, rawDescription, description2, rawDescription2, playerCount, playerLimit, gameMode, modeId, org, country, city, lat, lon)
+                VALUES ${rows}
+                ON CONFLICT (ip, port) DO UPDATE SET
+                lastSeen = excluded.lastSeen,
+                education = excluded.education,
+                version = excluded.version,
+                protocol = excluded.protocol,
+                description = excluded.description,
+                rawDescription = excluded.rawDescription,
+                description2 = excluded.description2,
+                rawDescription2 = excluded.rawDescription2,
+                playerCount = excluded.playerCount,
+                playerLimit = excluded.playerLimit,
+                gameMode = excluded.gameMode,
+                modeId = excluded.modeId,
+                org = excluded.org,
+                country = excluded.country,
+                city = excluded.city,
+                lat = excluded.lat,
+                lon = excluded.lon;`,
+                params
+            )
+        } catch (err) {
+            console.error('Error writing servers to db:', err)
+        }
+        if (config.writeLogs) console.log(`[${game}] Finished writing ${size} servers.`);
     }
+
+    async function handleBedrockQueue() {
+        if (bedrockQueue.length > 0 && (finished || bedrockQueue.length >= config.postgres.batch.bedrock.servers.min)) await writeBedrock(bedrockQueue.splice(0, config.postgres.batch.bedrock.servers.max));
+        setTimeout(handleBedrockQueue);
+    }
+    handleBedrockQueue();
     
     let writeStream = config[game].saveToFile ? fs.createWriteStream(`results${game == 'java' ? '' : '_b'}${config[game].compressed ? '' : '.json'}`) : null;
     if (config[game].saveToFile && !config[game].compressed) writeStream.write('[');
@@ -328,7 +359,6 @@ async function main(game) {
                             if (player.name == null || player.id == null || typeof player.name != 'string' || typeof player.id != 'string') continue;
                             playerQueue.push([player.name, player.id]);
                             historyQueue.push([newIp, newPort, player.name, player.id, result.lastSeen]);
-                            if (playerQueue.length > 0 && playerQueue.length >= config.postgres.batch.java.players) writePlayers(playerQueue.splice(0), historyQueue.splice(0));
                         }
                     }
                 }
@@ -381,9 +411,6 @@ async function main(game) {
                         Number(result.geo?.lon)
                     ].map(a => (typeof a == 'number' && isNaN(a)) ? null : a));
                 }
-
-                if (serverQueue.length > 0 && serverQueue.length >= config.postgres.batch.java.servers) writeServers(serverQueue.splice(0), scanAuth);
-                if (bedrockQueue.length > 0 && bedrockQueue.length >= config.postgres.batch.bedrock.servers) writeBedrock(bedrockQueue.splice(0));
             }
             if (config[game].saveToFile) {
                 result.players = response.players;
@@ -416,18 +443,42 @@ async function main(game) {
         const minutes = Math.floor(estimatedTime / 60);
         estimatedTime %= 60
         const seconds = Math.floor(estimatedTime);
-        console.log(`[${game}] ${serversPinged}/${totalServers} (${Math.floor(serversPinged / totalServers * 100)}%)  Results: ${resultCount}  Estimated ${hours > 0 ? `${hours}:${minutes < 10 ? 0 : ''}${minutes}` : minutes}:${seconds < 10 ? 0 : ''}${seconds} remaining.`)
+        let queueLogs = [...(game == 'java' ? [[serverQueue.length, 'Java Servers'], [playerQueue.length, 'Players'], [historyQueue.length, 'Player History']] : []), ...(game == 'bedrock' ? [[bedrockQueue.length, 'Bedrock Servers']] : [])];
+        console.log(`[${game}] ${serversPinged}/${totalServers} (${Math.floor(serversPinged / totalServers * 100)}%)  Results: ${resultCount}  Estimated ${hours > 0 ? `${hours}:${minutes < 10 ? 0 : ''}${minutes}` : minutes}:${seconds < 10 ? 0 : ''}${seconds} remaining.  ${config[game].postgres ? `Postgres Queues: ${queueLogs.map(a => `${a[1]}: ${a[0]}`).join('  ')}` : ''}`);
     }, 3000);
     serversPinged = 0;
     var startNum = Math.floor(Math.random() * totalServers) * 6;
     serverList = Buffer.concat([serverList.slice(startNum), serverList.slice(0, startNum)]);
     for (let j = 0; j < totalServers; j++) {
+        await new Promise(res => {
+            let interval = setInterval(() => {
+                if (
+                    serverQueue.length < config.postgres.batch.java.servers.max &&
+                    playerQueue.length < config.postgres.batch.java.players.max &&
+                    historyQueue.length < config.postgres.batch.java.players.max &&
+                    bedrockQueue.length < config.postgres.batch.bedrock.servers.max
+                ) {
+                    clearInterval(interval);
+                    res();
+                }
+            });
+        });
         pingServer(getServer(j));
         await new Promise(res => setTimeout(res, (1 / config[game].rate) * 1000));
     }
     await new Promise(res => setTimeout(res, config[game].timeout));
     clearInterval(progressLog);
-    console.log(`[${game}] Finished scanning ${resultCount} servers in ${(Date.now() - startTime) / 1000} seconds at ${new Date().toLocaleString()}.`);
+    finished = true;
+    console.log(`[${game}] Finished scanning ${resultCount} servers in ${((Date.now() - startTime) / 1000).toFixed(1)} seconds.`);
+    await new Promise(res => {
+        let interval = setInterval(() => {
+            let queueLogs = [[serverQueue.length, 'Java Servers'], [playerQueue.length, 'Players'], [historyQueue.length, 'Player History'], [bedrockQueue.length, 'Bedrock Servers']].filter(a => a[0] > 0);
+            if (queueLogs.length == 0) {
+                clearInterval(interval);
+                res();
+            } else console.log(`Waiting for database queries to complete:  ${queueLogs.map(a => `${a[1]}: ${a[0]}`).join('  ')}`);
+        }, 100)
+    });
     if (config[game].saveToFile) {
         if (!config[game].compressed) writeStream.write('\n]');
         writeStream.close();
@@ -450,9 +501,7 @@ async function main(game) {
             process.exit(1);
         }
     }
-    while (true) {
-        if (config.java.scan) await main('java');
-        if (config.bedrock.scan) await main('bedrock');
-        process.exit();
-    }
+    if (config.java.scan) await main('java');
+    if (config.bedrock.scan) await main('bedrock');
+    process.exit();
 })();
