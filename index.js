@@ -443,7 +443,7 @@ async function main(game) {
         const minutes = Math.floor(estimatedTime / 60);
         estimatedTime %= 60
         const seconds = Math.floor(estimatedTime);
-        let queueLogs = [...(game == 'java' ? [[serverQueue.length, 'Java Servers'], [playerQueue.length, 'Players'], [historyQueue.length, 'Player History']] : []), ...(game == 'bedrock' ? [[bedrockQueue.length, 'Bedrock Servers']] : [])];
+        let queueLogs = [...(game == 'java' ? [[serverQueue.length, 'Servers'], [playerQueue.length, 'Players'], [historyQueue.length, 'Player History']] : []), ...(game == 'bedrock' ? [[bedrockQueue.length, 'Servers']] : [])];
         console.log(`[${game}] ${serversPinged}/${totalServers} (${Math.floor(serversPinged / totalServers * 100)}%)  Results: ${resultCount}  Estimated ${hours > 0 ? `${hours}:${minutes < 10 ? 0 : ''}${minutes}` : minutes}:${seconds < 10 ? 0 : ''}${seconds} remaining.  ${config[game].postgres ? `Postgres Queues: ${queueLogs.map(a => `${a[1]}: ${a[0]}`).join('  ')}` : ''}`);
     }, 3000);
     serversPinged = 0;
@@ -472,7 +472,7 @@ async function main(game) {
     console.log(`[${game}] Finished scanning ${resultCount} servers in ${((Date.now() - startTime) / 1000).toFixed(1)} seconds.`);
     await new Promise(res => {
         let interval = setInterval(() => {
-            let queueLogs = [[serverQueue.length, 'Java Servers'], [playerQueue.length, 'Players'], [historyQueue.length, 'Player History'], [bedrockQueue.length, 'Bedrock Servers']].filter(a => a[0] > 0);
+            let queueLogs = [[serverQueue.length, 'Servers'], [playerQueue.length, 'Players'], [historyQueue.length, 'Player History'], [bedrockQueue.length, 'Servers']].filter(a => a[0] > 0);
             if (queueLogs.length == 0) {
                 clearInterval(interval);
                 res();
