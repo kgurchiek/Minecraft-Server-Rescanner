@@ -212,7 +212,7 @@ async function main(game) {
 
     async function handleServersQueue() {
         if (serverQueue.length > 0 && (finished || serverQueue.length >= config.postgres.batch.java.servers.min)) await writeServers(serverQueue.splice(0, config.postgres.batch.java.servers.max), scanAuth);
-        setTimeout(handleServersQueue);
+        if (!finished || serverQueue.length > 0) setTimeout(handleServersQueue);
     }
     handleServersQueue();
 
@@ -254,8 +254,13 @@ async function main(game) {
     }
 
     async function handlePlayersQueue() {
-        if (playerQueue.length > 0 && (finished || playerQueue.length >= config.postgres.batch.java.players.min)) await writePlayers(playerQueue.splice(0, config.postgres.batch.java.players.max), historyQueue.splice(0, config.postgres.batch.java.players.max));
-        setTimeout(handlePlayersQueue);
+        if (playerQueue.length > 0 && (finished || playerQueue.length >= config.postgres.batch.java.players.min)) {
+            let serverBatches = [];
+            while (serverQueue.length > 0) serverBatches.push(serverQueue.splice(0, config.postgres.batch.java.servers.max));
+            for (let batch of serverBatches) await writeServers(batch , scanAuth);
+            await writePlayers(playerQueue.splice(0, config.postgres.batch.java.players.max), historyQueue.splice(0, config.postgres.batch.java.players.max));
+        }
+        if (!finished || playerQueue.length > 0 || historyQueue.length > 0) setTimeout(handlePlayersQueue);
     }
     handlePlayersQueue();
     
@@ -297,7 +302,7 @@ async function main(game) {
 
     async function handleBedrockQueue() {
         if (bedrockQueue.length > 0 && (finished || bedrockQueue.length >= config.postgres.batch.bedrock.servers.min)) await writeBedrock(bedrockQueue.splice(0, config.postgres.batch.bedrock.servers.max));
-        setTimeout(handleBedrockQueue);
+        if (!finished || bedrockQueue.length > 0) setTimeout(handleBedrockQueue);
     }
     handleBedrockQueue();
     
@@ -478,7 +483,7 @@ async function main(game) {
     await new Promise(res => setTimeout(res, config[game].timeout));
     clearInterval(progressLog);
     finished = true;
-    console.log(`[${game}] Finished scanning ${resultCount} servers in ${((Date.now() - startTime) / 1000).toFixed(1)} seconds.`);
+    console.log(`[${game}] Scan complete. (duration: ${((Date.now() - startTime) / 1000).toFixed(1)} seconds,  responses: ${resultCount.toLocaleString()})`);
     await new Promise(res => {
         let interval = setInterval(() => {
             let queueLogs = [[serverQueue.length, 'Servers'], [playerQueue.length, 'Players'], [historyQueue.length, 'Player History'], [bedrockQueue.length, 'Servers']].filter(a => a[0] > 0);
