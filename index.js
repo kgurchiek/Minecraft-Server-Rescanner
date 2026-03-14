@@ -257,7 +257,7 @@ async function main(game) {
         if (playerQueue.length > 0 && (finished || playerQueue.length >= config.postgres.batch.java.players.min)) {
             let serverBatches = [];
             while (serverQueue.length > 0) serverBatches.push(serverQueue.splice(0, config.postgres.batch.java.servers.max));
-            if (config.writeLogs) console.log(`[${game}] Writing ${serverBatches.length} server batches before player data...`);
+            if (config.writeLogs) console.log(`[${game}] Writing ${serverBatches.length} server batch${serverBatches.length == 1 ? '' : 'es'} before player data...`);
             for (let batch of serverBatches) await writeServers(batch , scanAuth);
             if (config.writeLogs) console.log(`[${game}] Finished writing ${serverBatches.length} server batches.`);
             await writePlayers(playerQueue.splice(0, config.postgres.batch.java.players.max), historyQueue.splice(0, config.postgres.batch.java.players.max));
