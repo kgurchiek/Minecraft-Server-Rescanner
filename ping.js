@@ -134,6 +134,9 @@ module.exports = {
                             buffers.push(Buffer.from([username.length]));
                             buffers.push(Buffer.from(username, 'utf-8')); // username
                             break;
+                        case 'playerUUID':
+                            buffers.push(Buffer.alloc(16));
+                            break;
                         default:
                             break;
                     }
