@@ -124,7 +124,7 @@ module.exports = {
             const username = 'Cornbread2100_';
             
             const packetFormat = mcData.protocol.login.toServer.types.packet_login_start[1];
-            var buffers = [createHandshake(ip, port, protocol, 2), Buffer.from([0x00])];
+            var buffers = [Buffer.from([0x00])];
             for (var i = 0; i < packetFormat.length; i++) {
                 if (packetFormat[i].type.includes('option')) {
                     buffers.push(Buffer.from([0x00]));
@@ -146,7 +146,7 @@ module.exports = {
             const startLoginPacket = Buffer.concat(buffers);
             packetLength = Buffer.alloc(1);
             packetLength.writeUInt8(startLoginPacket.length);
-            const response = await send(ip, port, Buffer.concat([buffer, packetLength, startLoginPacket]), 6000);
+            const response = await send(ip, port, Buffer.concat([createHandshake(ip, port, protocol, 2), packetLength, startLoginPacket]), 6000);
             if (typeof response == 'string') return `Error: ${response}`;
             else return response[0] == 0 ? 'unknown' : (response[0] != 1);
         } catch (error) { return `Error: ${error}`; }
