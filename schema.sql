@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg22.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg22.04+1)
+\restrict NdwJx9BBKMxnvPSJNXZe6FX8mdPN2k8RyZc4KYledcduo9bA0dX1zkkUagVS67B
+
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg24.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -124,52 +126,18 @@ ALTER SEQUENCE public.bedrock_serverid_seq OWNED BY public.bedrock.serverid;
 
 
 --
--- Name: history; Type: TABLE; Schema: public; Owner: postgres
+-- Name: playerhistory; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.history (
-    serverid bigint NOT NULL,
-    playerid bigint NOT NULL,
+CREATE TABLE public.playerhistory (
+    name text,
+    id text,
+    serverid bigint,
     lastsession bigint
 );
 
 
-ALTER TABLE public.history OWNER TO postgres;
-
---
--- Name: players; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.players (
-    playerid bigint NOT NULL,
-    name text,
-    id text
-);
-
-
-ALTER TABLE public.players OWNER TO postgres;
-
---
--- Name: players_playerid_seq; Type: SEQUENCE; Schema: public; Owner: postgres
---
-
-CREATE SEQUENCE public.players_playerid_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.players_playerid_seq OWNER TO postgres;
-
---
--- Name: players_playerid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
---
-
-ALTER SEQUENCE public.players_playerid_seq OWNED BY public.players.playerid;
-
+ALTER TABLE public.playerhistory OWNER TO postgres;
 
 --
 -- Name: servers; Type: TABLE; Schema: public; Owner: postgres
@@ -233,13 +201,6 @@ ALTER TABLE ONLY public.bedrock ALTER COLUMN serverid SET DEFAULT nextval('publi
 
 
 --
--- Name: players playerid; Type: DEFAULT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.players ALTER COLUMN playerid SET DEFAULT nextval('public.players_playerid_seq'::regclass);
-
-
---
 -- Name: servers serverid; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -263,27 +224,11 @@ ALTER TABLE ONLY public.bedrock
 
 
 --
--- Name: history history_serverid_playerid_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: playerhistory players_name_id_serverid_constraint; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.history
-    ADD CONSTRAINT history_serverid_playerid_key UNIQUE (serverid, playerid);
-
-
---
--- Name: players players_name_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.players
-    ADD CONSTRAINT players_name_id_key UNIQUE (name, id);
-
-
---
--- Name: players players_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.players
-    ADD CONSTRAINT players_pkey PRIMARY KEY (playerid);
+ALTER TABLE ONLY public.playerhistory
+    ADD CONSTRAINT players_name_id_serverid_constraint UNIQUE (name, id, serverid);
 
 
 --
@@ -317,24 +262,10 @@ CREATE INDEX bedrock_ip ON public.bedrock USING btree (ip);
 
 
 --
--- Name: bedrock_lastseen; Type: INDEX; Schema: public; Owner: postgres
+-- Name: bedrock_lastseen_desc; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX bedrock_lastseen ON public.bedrock USING btree (lastseen);
-
-
---
--- Name: bedrock_lat; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX bedrock_lat ON public.bedrock USING btree (lat);
-
-
---
--- Name: bedrock_lon; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX bedrock_lon ON public.bedrock USING btree (lon);
+CREATE INDEX bedrock_lastseen_desc ON public.bedrock USING btree (lastseen DESC);
 
 
 --
@@ -387,13 +318,6 @@ CREATE INDEX cracked_active_index ON public.servers USING btree (cracked) WHERE 
 
 
 --
--- Name: cracked_lastseen_desc_index; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX cracked_lastseen_desc_index ON public.servers USING btree (lastseen DESC) WHERE (cracked IS NOT NULL);
-
-
---
 -- Name: description_trgm_index; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -415,34 +339,6 @@ CREATE INDEX discovered_index ON public.servers USING btree (discovered);
 
 
 --
--- Name: history_playerid_index; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX history_playerid_index ON public.history USING btree (playerid);
-
-
---
--- Name: history_serverid_index; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX history_serverid_index ON public.history USING btree (serverid);
-
-
---
--- Name: history_serverid_playerid_index; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX history_serverid_playerid_index ON public.history USING btree (serverid, playerid);
-
-
---
--- Name: id_index; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX id_index ON public.players USING btree (id);
-
-
---
 -- Name: ip_index; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -454,41 +350,6 @@ CREATE INDEX ip_index ON public.servers USING btree (ip);
 --
 
 CREATE INDEX lastseen_desc_index ON public.servers USING btree (lastseen DESC);
-
-
---
--- Name: lastseen_index; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX lastseen_index ON public.servers USING btree (lastseen);
-
-
---
--- Name: lastsession_index; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX lastsession_index ON public.history USING btree (lastsession);
-
-
---
--- Name: lat_index; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX lat_index ON public.servers USING btree (lat);
-
-
---
--- Name: lon_index; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX lon_index ON public.servers USING btree (lon);
-
-
---
--- Name: name_index; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX name_index ON public.players USING btree (name);
 
 
 --
@@ -506,13 +367,6 @@ CREATE INDEX playercount_index ON public.servers USING btree (playercount);
 
 
 --
--- Name: playerid_index; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX playerid_index ON public.players USING btree (playerid);
-
-
---
 -- Name: playerlimit_index; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -520,10 +374,24 @@ CREATE INDEX playerlimit_index ON public.servers USING btree (playerlimit);
 
 
 --
--- Name: players_playerid_name_index; Type: INDEX; Schema: public; Owner: postgres
+-- Name: players_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX players_playerid_name_index ON public.players USING btree (playerid, name);
+CREATE INDEX players_id ON public.playerhistory USING btree (id);
+
+
+--
+-- Name: players_name; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX players_name ON public.playerhistory USING btree (name);
+
+
+--
+-- Name: players_serverid; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX players_serverid ON public.playerhistory USING btree (serverid);
 
 
 --
@@ -538,13 +406,6 @@ CREATE INDEX port_index ON public.servers USING btree (port);
 --
 
 CREATE INDEX protocol_index ON public.servers USING btree (protocol);
-
-
---
--- Name: serverid_index; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX serverid_index ON public.servers USING btree (serverid);
 
 
 --
@@ -569,29 +430,8 @@ CREATE INDEX whitelisted_active_index ON public.servers USING btree (whitelisted
 
 
 --
--- Name: whitelisted_lastseen_desc_index; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX whitelisted_lastseen_desc_index ON public.servers USING btree (lastseen DESC) WHERE (whitelisted IS NOT NULL);
-
-
---
--- Name: history history_playerid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.history
-    ADD CONSTRAINT history_playerid_fkey FOREIGN KEY (playerid) REFERENCES public.players(playerid) ON DELETE CASCADE;
-
-
---
--- Name: history history_serverid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.history
-    ADD CONSTRAINT history_serverid_fkey FOREIGN KEY (serverid) REFERENCES public.servers(serverid) ON DELETE CASCADE;
-
-
---
 -- PostgreSQL database dump complete
 --
+
+\unrestrict NdwJx9BBKMxnvPSJNXZe6FX8mdPN2k8RyZc4KYledcduo9bA0dX1zkkUagVS67B
 
