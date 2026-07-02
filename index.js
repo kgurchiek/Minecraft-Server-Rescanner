@@ -452,7 +452,7 @@ async function main(game) {
         const minutes = Math.floor(estimatedTime / 60);
         estimatedTime %= 60
         const seconds = Math.floor(estimatedTime);
-        let queueLogs = [['Servers', serverQueue.length], ['Players', playerQueue.length], ['Servers', bedrockQueue.length]].filter(a => a[0] > 0);
+        let queueLogs = [['Servers', serverQueue.length], ['Players', playerQueue.length], ['Servers', bedrockQueue.length]].filter(a => a[1] > 0);
         console.log(`[${game}] ${serversPinged}/${totalServers} (${Math.floor(serversPinged / totalServers * 100)}%)  Results: ${resultCount}  Estimated ${hours > 0 ? `${hours}:${minutes < 10 ? 0 : ''}${minutes}` : minutes}:${seconds < 10 ? 0 : ''}${seconds} remaining.${config[game].postgres ? `  Queues: ${queueLogs.map(a => `${a[0]}: ${a[1]}`).join(', ')}` : ''}`);
     }, 3000);
     serversPinged = 0;
@@ -481,7 +481,7 @@ async function main(game) {
     await new Promise(res => {
         let start = Date.now();
         let interval = setInterval(() => {
-            let queueLogs = [['Servers', serverQueue.length], ['Players', playerQueue.length], ['Servers', bedrockQueue.length]].filter(a => a[0] > 0);
+            let queueLogs = [['Servers', serverQueue.length], ['Players', playerQueue.length], ['Servers', bedrockQueue.length]].filter(a => a[1] > 0);
             if (queueLogs.length == 0) {
                 clearInterval(interval);
                 res();
