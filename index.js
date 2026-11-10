@@ -51,73 +51,78 @@ function cleanDescription(description) {
 }
 
 async function extractTar(buf, dir) {
-        const tmpName = `mmdb_${Date.now()}_${Math.random().toString(36).slice(2)}.tar.gz`;
-        const tmpPath = path.join(__dirname, tmpName);
-        await fs.promises.writeFile(tmpPath, buf);
-        try {
-            const filter = (entryPath) => entryPath.endsWith('.mmdb');
-            await tar.x({ file: tmpPath, cwd: dir, strip: 1, filter });
-        } finally {
-            await fs.promises.unlink(tmpPath).catch(() => {});
-        }
+    const tmpName = `mmdb_${Date.now()}_${Math.random().toString(36).slice(2)}.tar.gz`;
+    const tmpPath = path.join(__dirname, tmpName);
+    await fs.promises.writeFile(tmpPath, buf);
+    try {
+        const filter = (entryPath) => entryPath.endsWith('.mmdb');
+        await tar.x({ file: tmpPath, cwd: dir, strip: 1, filter });
+    } finally {
+        await fs.promises.unlink(tmpPath).catch(() => {});
+    }
 }
 
+updateMaxmind();
 async function updateMaxmind() {
     let lastUpdate = fs.statSync('GeoLite2-City.mmdb').mtimeMs;
-    let response;
-    try {
-        response = await fetch('https://download.maxmind.com/geoip/databases/GeoLite2-City/download?suffix=tar.gz', {
-            method: 'HEAD',
-            headers: {
-                Authorization: `Basic ${btoa(`${config.maxmind.userId}:${config.maxmind.licenseKey}`)}`
-            }
-        });
-        if (response.status != 200) return console.error(`Error fetching MaxMind database (code ${response.status})`);
-    } catch (err) {
-        return console.rerror('Error fetching MaxMind database:', err);
-    }
+    if (Date.now() - lastUpdate > 24 * 60 * 60 * 1000) {
+        let response;
+        try {
+            response = await fetch('https://download.maxmind.com/geoip/databases/GeoLite2-City/download?suffix=tar.gz', {
+                method: 'HEAD',
+                headers: {
+                    Authorization: `Basic ${btoa(`${config.maxmind.userId}:${config.maxmind.licenseKey}`)}`
+                }
+            });
+            if (response.status != 200) return console.error(`Error fetching MaxMind database headers (code ${response.status})`);
+        } catch (err) {
+            return console.rerror('Error fetching MaxMind database:', err);
+        }
 
-    let newUpdate = new Date(response.headers.get('last-modified')).getTime();
-    if (newUpdate > lastUpdate) {
-        let city = await fetch('https://download.maxmind.com/geoip/databases/GeoLite2-City/download?suffix=tar.gz', {
-            method: 'GET',
-            headers: {
-                Authorization: `Basic ${btoa(`${config.maxmind.userId}:${config.maxmind.licenseKey}`)}`
-            }
-        });
-        if (city.status == 200) {
-            let buf = Buffer.from(await city.arrayBuffer());
-            await extractTar(buf, '.');
-        } else return console.error(`Error fetching MaxMind database (code ${city.status})`);
+        let newUpdate = new Date(response.headers.get('last-modified')).getTime();
+        if (newUpdate > lastUpdate) {
+            let city = await fetch('https://download.maxmind.com/geoip/databases/GeoLite2-City/download?suffix=tar.gz', {
+                method: 'GET',
+                headers: {
+                    Authorization: `Basic ${btoa(`${config.maxmind.userId}:${config.maxmind.licenseKey}`)}`
+                }
+            });
+            if (city.status == 200) {
+                let buf = Buffer.from(await city.arrayBuffer());
+                await extractTar(buf, '.');
+            } else return console.error(`Error fetching MaxMind database (code ${city.status})`);
+        }
     }
 
 
     lastUpdate = fs.statSync('GeoLite2-ASN.mmdb').mtimeMs;
-    try {
-        response = await fetch('https://download.maxmind.com/geoip/databases/GeoLite2-City/download?suffix=tar.gz', {
-            method: 'HEAD',
-            headers: { 
-                Authorization: `Basic ${btoa(`${config.maxmind.userId}:${config.maxmind.licenseKey}`)}`
-            }
-        });
-        if (response.status != 200) return console.error(`Error fetching MaxMind database (code ${response.status})`);
-    } catch (err) {
-        return console.rerror('Error fetching MaxMind database:', err);
-    }
-
-    newUpdate = new Date(response.headers.get('last-modified')).getTime();
-    if (newUpdate > lastUpdate) {
-        let asn = await fetch('https://download.maxmind.com/geoip/databases/GeoLite2-ASN/download?suffix=tar.gz', {
-            method: 'GET',
-            headers: {
-                Authorization: `Basic ${btoa(`${config.maxmind.userId}:${config.maxmind.licenseKey}`)}`
-            }
-        });
-        if (asn.status == 200) {
-            let buf = Buffer.from(await asn.arrayBuffer());
-            await extractTar(buf, '.');
+    if (Date.now() - lastUpdate > 24 * 60 * 60 * 1000) {
+        try {
+            response = await fetch('https://download.maxmind.com/geoip/databases/GeoLite2-City/download?suffix=tar.gz', {
+                method: 'HEAD',
+                headers: { 
+                    Authorization: `Basic ${btoa(`${config.maxmind.userId}:${config.maxmind.licenseKey}`)}`
+                }
+            });
+            if (response.status != 200) return console.error(`Error fetching MaxMind database headers (code ${response.status})`);
+        } catch (err) {
+            return console.rerror('Error fetching MaxMind database:', err);
         }
-        else return console.error(`Error fetching MaxMind database (code ${asn.status})`);
+
+        newUpdate = new Date(response.headers.get('last-modified')).getTime();
+        if (newUpdate > lastUpdate) {
+            let asn = await fetch('https://download.maxmind.com/geoip/databases/GeoLite2-ASN/download?suffix=tar.gz', {
+                method: 'GET',
+                headers: {
+                    Authorization: `Basic ${btoa(`${config.maxmind.userId}:${config.maxmind.licenseKey}`)}`
+                }
+            });
+            if (asn.status == 200) {
+                let buf = Buffer.from(await asn.arrayBuffer());
+                await extractTar(buf, '.');
+            }
+            else return console.error(`Error fetching MaxMind database (code ${asn.status})`);
+        }
     }
 }
 
