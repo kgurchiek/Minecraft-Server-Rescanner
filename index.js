@@ -364,8 +364,8 @@ async function main(game) {
                     if (response.players?.sample != null && Array.isArray(response.players.sample)) {
                         for (const player of response.players.sample) {
                             if (
-                                typeof player.name != 'string' || player.name.length == 0 || player.name.length > 16 || player.name.split('').some(a => !usernameChars.includes(a)) ||
-                                typeof player.id != 'string' || player.id.length != 36 || player.id.split('').some(a => !uuidChars.includes(a))
+                                typeof player.name !== 'string' || player.name.length === 0 || player.name.length > 16 || player.name.split('').some(a => !usernameChars.includes(a)) ||
+                                typeof player.id !== 'string' || player.id.length !== 36 || !['3', '4'].includes(player.id[14]) || !['8', '9', 'a', 'b'].includes(player.id[19]) || player.id.split('').some(a => !uuidChars.includes(a))
                             ) continue;
                             playerQueue.push([player.name, player.id, result.lastSeen, newIp, newPort]);
                         }
