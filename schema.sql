@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict NdwJx9BBKMxnvPSJNXZe6FX8mdPN2k8RyZc4KYledcduo9bA0dX1zkkUagVS67B
+\restrict KUAQ90Lo8fJHFY3v1LmMcIwsGw5yuS9BS1PjgdAbFF3wLDiZDC2cOiVMbf6x5JI
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg24.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -131,7 +131,7 @@ ALTER SEQUENCE public.bedrock_serverid_seq OWNED BY public.bedrock.serverid;
 
 CREATE TABLE public.playerhistory (
     name text,
-    id text,
+    id uuid,
     serverid bigint,
     lastsession bigint
 );
@@ -433,5 +433,5 @@ CREATE INDEX whitelisted_active_index ON public.servers USING btree (whitelisted
 -- PostgreSQL database dump complete
 --
 
-\unrestrict NdwJx9BBKMxnvPSJNXZe6FX8mdPN2k8RyZc4KYledcduo9bA0dX1zkkUagVS67B
+\unrestrict KUAQ90Lo8fJHFY3v1LmMcIwsGw5yuS9BS1PjgdAbFF3wLDiZDC2cOiVMbf6x5JI
 
